@@ -1,98 +1,206 @@
-# alexa-cli
+# `alexa-cli` — Alexa routines and smart-home devices from the terminal
 
-Gérer les appareils de maison connectée et les routines vocales Alexa depuis le terminal : lister,
-créer, ajouter des phrases, changer d'appareil, activer, lancer, supprimer, et repérer les routines
-cassées.
+**For scripts and agents: `--json` or `--plain`.** Every listing (`routines`, `devices`, `appliances`, `skills`,
+`audit`) writes one tab-separated record per line with `--plain`, or one JSON document with `--json`. Every command
+that changes something answers a JSON document with `--json`, errors included, and only says what it would do
+until it is given `--apply`.
 
-> **API non officielle.** alexa-cli parle à l'API interne de l'appli Alexa, à travers
-> [alexa-remote2](https://github.com/Apollon77/alexa-remote). Amazon peut la changer à tout moment.
-> Le format d'écriture des routines vient de la rétro-ingénierie faite par
-> [alexa-mcp](https://github.com/snordquist/alexa-mcp).
+Create voice routines, give them more ways to be said, point them at another device, switch them on and off, find
+the ones a deleted device broke, and see which skill keeps bringing a device back — from the terminal or from a
+small local web page.
 
-## Installation
+```console
+$ alexa-cli create --phrase "pause télé" --phrase "mets la télé en pause" --device "Télé pause" --apply
+create "pause télé": "pause télé", "mets la télé en pause" -> turnOn Télé pause
+created amzn1.alexa.automation.2ae4b900-…
+
+$ alexa-cli phrases "reprends la télé" --add "relance la télé" --apply
+$ alexa-cli retarget "on va dormir" --from "Smart TV" --device "Télé" --apply
+$ alexa-cli audit
+ROUTINE                  MISSING                          ID
+c'est l'heure du réveil  turnOn 5e46ba56-bbb3-4992-…      amzn1.alexa.automation.2fef1c7a-…
+```
+
+> ⚠️ **Unofficial API.** Amazon offers no public API for routines. alexa-cli talks to the same internal API as the
+> Alexa app, through [alexa-remote2](https://github.com/Apollon77/alexa-remote); the routine write format comes
+> from the reverse-engineering done by [alexa-mcp](https://github.com/snordquist/alexa-mcp). It can change without
+> notice. Use it for your own account.
+
+## Contents
+
+- [Install](#install) · [Sign in](#sign-in) · [Commands](#commands) · [Output for scripts](#output-for-scripts)
+- [Web interface](#web-interface) · [How it works](#how-it-works) · [Troubleshooting](#troubleshooting)
+- [Development](#development) · [Licence](#licence)
+
+## Install
+
+Node 22 or newer.
 
 ```bash
 git clone https://github.com/nicotoine/alexa-cli.git
 cd alexa-cli
-npm install
-ln -s "$PWD/cli.js" ~/.local/bin/alexa-cli   # ou : npm link
+./install.sh
 ```
 
-Node 18 ou plus récent.
+`install.sh` installs the dependencies, links `alexa-cli` into `~/.local/bin` and sets up shell completion (bash,
+zsh or fish). Each step is reported; a failed step does not stop the others.
 
-## Connexion
+| Option | |
+|---|---|
+| `--bin-dir DIR` | link somewhere else than `~/.local/bin` |
+| `--shell zsh` | completion for another shell than `$SHELL` |
+| `--no-completion` | skip completion |
+| `--uninstall` | remove the link and the completion (the Amazon session stays) |
+
+Re-run `./install.sh` after a `git pull`: it is idempotent.
+
+## Sign in
 
 ```bash
 alexa-cli login
 ```
 
-Ouvrez <http://127.0.0.1:3456/> et connectez-vous **sur la page d'Amazon** (double authentification
-comprise). Le proxy n'écoute que sur `127.0.0.1` ; alexa-cli ne voit pas le mot de passe et ne garde que
-les jetons, dans `~/.config/alexa-cli/auth.json` (droits `0600`). `alexa-cli logout` les efface.
+Open <http://127.0.0.1:3456/> and sign in **on Amazon's own page**, two-step verification included. The login runs
+through a proxy listening on `127.0.0.1` only: alexa-cli never sees the password and keeps only the resulting tokens,
+in `~/.config/alexa-cli/auth.json` (mode `0600`). `alexa-cli status` says whether Amazon still accepts them;
+`alexa-cli logout` deletes them.
 
-Les réglages visent Amazon France (`amazon.fr`, `fr-FR`) : voir les constantes en tête de `cli.js`
-pour un autre pays.
+The settings target Amazon France (`amazon.fr`, `fr-FR`); see `LOCALE` in [`src/model.js`](src/model.js) and the
+connection settings in [`src/client.js`](src/client.js) for another country.
 
-## Commandes
+## Commands
 
-Une `<routine>` se désigne par son nom, une de ses phrases ou son identifiant. Tout ce qui modifie
-quelque chose **affiche seulement ce qui serait fait** tant que `--apply` n'est pas passé.
+A `<routine>` is named by its name, one of its phrases or its id. A `<device>` by its name or id. Run
+`alexa-cli <command> --help` for every option.
 
-| Commande | Effet |
+### Routines
+
+| Command | |
 |---|---|
-| `devices [texte]` | appareils qu'une routine peut viser (nom, identifiant) |
-| `appliances [texte]` | appareils avec leur source (`AAA` = Matter, `SKILL` = skill) |
-| `skills [texte]` | skills activées et appareils fournis par chacune (la page « Vos skills » d'Amazon oublie la plupart des skills de maison connectée : alexa-cli les retrouve par leurs appareils) |
-| `forget <appareil> [--force] --apply` | supprime un appareil d'Alexa ; refusé tant qu'une routine l'utilise |
-| `routines [texte]` | liste les routines |
-| `show <routine>` | JSON complet |
-| `create --phrase "…" [--phrase "…"] --device "…" [--op turnOn\|turnOff] [--name "…"] --apply` | routine vocale qui allume (par défaut) ou éteint un appareil |
-| `phrases <routine> [--add "…"] [--remove "…"] --apply` | ajoute ou retire des façons de dire la routine |
-| `retarget <routine> --device "…" [--from "…"] [--op …] --apply` | même routine sur un autre appareil (même identifiant) ; `--from` choisit l'appareil à remplacer quand la routine en pilote plusieurs |
-| `enable <routine> --apply` / `disable <routine> --apply` | active / désactive |
-| `run <routine> [--on "<Echo>"]` | lance la routine maintenant |
-| `delete <routine> --apply` | supprime |
-| `audit` | routines dont l'appareil visé n'existe plus |
+| `routines [text]` | list, filtered on name and phrases |
+| `show <routine>` | the full JSON Amazon returns |
+| `create --phrase "…" [--phrase "…"…] --device "…" [--op turnOn\|turnOff] [--name "…"]` | voice routine that turns a device on (default) or off |
+| `phrases <routine> [--add "…"]… [--remove "…"]…` | add or remove ways to say it |
+| `retarget <routine> --device "…" [--from "…"] [--op …]` | same routine on another device — same id, phrases and other actions; `--from` picks which device to replace when there are several |
+| `enable <routine>` / `disable <routine>` | switch on / off |
+| `run <routine> [--on "<Echo>"]` | run it now, as if it had been said |
+| `delete <routine>` | delete |
 
-`--json` donne la sortie brute pour `devices`, `appliances`, `skills`, `routines` et `audit`.
+### Smart home
 
-## Interface web
+| Command | |
+|---|---|
+| `devices [text]` | devices a routine can target |
+| `appliances [text]` | every device with its source (`matter`, `skill`), maker and reachability |
+| `skills [text]` | enabled skills and the devices each one provides |
+| `forget <device> [--force]` | delete a device; refused while a routine uses it |
+
+`skills` exists because Amazon's own "your skills" page leaves most smart-home skills out: alexa-cli finds them
+through the devices they provide. A device deleted with `forget` that shows up again comes from a skill that is
+still linked — unlink it in the Alexa app.
+
+### Checks and setup
+
+| Command | |
+|---|---|
+| `audit` | routines with an action on a device that no longer exists |
+| `snapshot` | every list over one connection, one JSON line per part as soon as it is ready |
+| `login` / `logout` / `status` | the Amazon session |
+| `completion bash\|zsh\|fish` | the completion script (`install-completion.sh` wires it) |
+
+**Nothing changes without `--apply`.** `create`, `phrases`, `retarget`, `enable`, `disable`, `delete` and `forget`
+print what they would do and stop; add `--apply` to do it. `run` acts at once.
+
+## Output for scripts
+
+| Mode | stdout | Errors | Use it for |
+|---|---|---|---|
+| default | aligned columns, colour on a terminal | `error: …` on stderr | a person |
+| `--plain` | one record per line, fields separated by tabs; lists joined by ` \| `; tabs and newlines escaped as `\t` `\n` | on stderr | `cut`, `awk`, an agent reading a listing |
+| `--json` | one JSON document, nothing else | `{"error": "…"}` on stdout | anything that parses |
+
+Notes for a person — "dry run", "nothing to show" — always go to stderr. The exit code is the signal in every mode:
+`0` done, `1` failed, `2` wrong usage.
 
 ```bash
-npm run ui        # http://127.0.0.1:3457/
+alexa-cli routines --plain | cut -f2              # names
+alexa-cli audit --json | jq -r '.[].name'          # broken routines
+alexa-cli delete "test" --apply --json | jq .applied
 ```
 
-Une page locale par-dessus la CLI : routines (filtre, phrases à ajouter ou retirer, activer, lancer,
-changer d'appareil, supprimer, créer), appareils avec les routines qui les utilisent, skills, audit.
-Chaque modification passe par la simulation de la CLI, affichée avant de confirmer.
-
-Le serveur (`interface/server.js`, sans dépendance) n'écoute que sur `127.0.0.1`, refuse les autres noms
-d'hôte, n'exécute que les commandes de sa liste blanche et passe les arguments à `cli.js` sans shell.
-Les écritures exigent un en-tête `X-Alexa-Cli` qu'une page d'un autre site ne peut pas envoyer.
-
-## Exemples
+## Web interface
 
 ```bash
-alexa-cli create --phrase "pause télé" --phrase "mets la télé en pause" --device "Télé pause" --apply
-alexa-cli phrases "reprends la télé" --add "relance la télé" --apply
-alexa-cli retarget "éteint la télé" --device "Télé" --apply
-alexa-cli audit
+npm run ui        # → http://127.0.0.1:3457/
 ```
 
-## Bon à savoir
+A page over the CLI: routines (filter, add and remove phrases, enable, run, change device, delete, create), devices
+with the routines that use them, skills, and the audit.
 
-- **Accents** : le corps des requêtes est envoyé avec les caractères non ASCII échappés (`é`) ;
-  envoyés tels quels, Amazon enregistrait « tÃ©lÃ© » et la phrase n'était jamais reconnue.
-- **Erreurs déguisées** : une écriture refusée répond HTTP 200 avec
-  `{"message":"Input failed to validate."}` ; alexa-cli lit la réponse et signale l'échec.
-- **Pas de nouvelle tentative à la création** : une réponse perdue après une création réussie
-  dupliquerait la routine.
-- **Modifier** (`phrases`, `retarget`, `enable`, `disable`) reconstruit la routine entière à partir de
-  son état actuel et revalide chaque action, comme le fait l'appli.
-- Seules les routines à **un** déclencheur vocal se modifient avec `phrases` ; `create` et `retarget`
-  ne gèrent qu'une action de maison connectée (allumer / éteindre).
+- **Streamed and cached.** One `snapshot` connection sends each list as soon as it is ready, routines first (about
+  two seconds); the server keeps the last one, so the page draws at once on the next visit and refreshes behind.
+- **Optimistic.** A change is drawn immediately and sent in the background; the card shows "enregistrement…" until
+  Amazon answers. A deletion waits five seconds behind an **Annuler** toast before anything is sent. If Amazon
+  refuses, the change is undone and a toast says why, with **Réessayer** — or **Forcer** for a device still used by a
+  routine. Once nothing is in flight, the page re-syncs quietly.
+- **Local only.** The server listens on `127.0.0.1`, refuses any other host name, runs only a whitelist of CLI
+  commands with arguments passed without a shell, and requires a header a page from another site cannot send.
+
+## How it works
+
+The Alexa app reads routines from `/api/behaviors/v2/automations` but writes them through
+`/api/behaviors/automations` — a `POST` to the v2 path answers 404 — with a body that looks nothing like what it
+reads: flat, the trigger and the sequence as JSON *strings*, the phrase payload a JSON string inside that, and every
+action normalised by `/api/behaviors/operation/validate` first. A malformed write answers **HTTP 200** with
+`{"message": "Input failed to validate."}`, so alexa-cli checks the answer, not the status.
+
+There is no partial update: changing a phrase or a status is a full rebuild of the routine from its current state
+and a `PUT`, every action re-validated, as the app does. That is why `retarget` keeps the id, the other phrases and
+the other actions.
+
+Request bodies escape every non-ASCII character (`é`). Sent as is, Amazon stored "télé" as "tÃ©lÃ©" — a phrase
+no one can say.
+
+## Troubleshooting
+
+| Symptom | Cause, fix |
+|---|---|
+| `not logged in` | `alexa-cli login` |
+| `401 Unauthorized`, `Cookie invalid` | the session expired: `alexa-cli login` again |
+| `phrase already used by: …` | another routine answers to it; `alexa-cli routines "<phrase>"` finds which |
+| a phrase is never recognised | check it with `show`: accents must read correctly |
+| a forgotten device comes back | its skill is still linked: `alexa-cli skills <name>`, then unlink the skill in the Alexa app |
+| `retarget needs exactly one matching device action` | the routine controls several devices: say which with `--from` |
+| what is the CLI sending? | `--debug` logs every request to stderr (truncated) |
+
+## Development
+
+```bash
+npm test                  # CLI and interface, offline (a fake Alexa client)
+npm run surface:update    # re-pin the command surface, when it is meant to change
+```
+
+```
+bin/alexa-cli.js          entry point
+src/
+  cli.js                  front end: global options, help, dispatch, error rendering
+  args.js                 declared commands → parser, --help, completion, pinned surface
+  commands/               one module per feature: routines, devices, skills, audit, account, completion
+  model.js                routines, devices and skills: reading and the write format — pure, no network
+  client.js               the Alexa API (the only module that knows alexa-remote2)
+  auth.js                 where the tokens live
+  context.js              the lazily connected client, the --apply guard
+  ui.js                   human, --plain and --json output
+interface/
+  server/                 app (routes, protections), writes (whitelist), cli-runner (queue, stream), index
+  public/js/              store (optimistic engine), actions, api, model, toasts, views/ — ES modules, no build
+  test/
+test/                     node:test suites; command_surface.json pins every command and option
+```
+
+The conventions are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Licence
 
-MIT. Des parties sont adaptées d'[alexa-mcp](https://github.com/snordquist/alexa-mcp) (MIT,
-© Sascha Nordquist) : voir `LICENSE`.
+MIT — see [`LICENSE`](LICENSE). Parts are adapted from [alexa-mcp](https://github.com/snordquist/alexa-mcp)
+(MIT, © Sascha Nordquist).

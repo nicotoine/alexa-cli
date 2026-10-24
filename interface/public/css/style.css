@@ -190,18 +190,6 @@ dialog {
 }
 dialog::backdrop { background: rgb(0 0 0 / 45%); }
 dialog h2 { margin: 0 0 4px; font-size: 17px; }
-pre {
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: var(--surface-2);
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 13px;
-  max-height: 40vh;
-  overflow: auto;
-}
-.check { display: flex; align-items: center; gap: 8px; font-weight: 400; margin-bottom: 12px; }
-.check input { width: auto; }
 
 /* Sync status in the header */
 .sync { color: var(--muted); font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }

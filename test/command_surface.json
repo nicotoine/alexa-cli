@@ -1,0 +1,88 @@
+{
+  "alexa-cli appliances": [
+    "--json MODE",
+    "--plain MODE",
+    "<text>"
+  ],
+  "alexa-cli audit": [
+    "--json MODE",
+    "--plain MODE"
+  ],
+  "alexa-cli completion": [
+    "<shell>!"
+  ],
+  "alexa-cli create": [
+    "--apply FLAG",
+    "--device STRING",
+    "--json MODE",
+    "--name STRING",
+    "--op CHOICE(turnOn|turnOff)",
+    "--phrase LIST"
+  ],
+  "alexa-cli delete": [
+    "--apply FLAG",
+    "--json MODE",
+    "<routine>!"
+  ],
+  "alexa-cli devices": [
+    "--json MODE",
+    "--plain MODE",
+    "<text>"
+  ],
+  "alexa-cli disable": [
+    "--apply FLAG",
+    "--json MODE",
+    "<routine>!"
+  ],
+  "alexa-cli enable": [
+    "--apply FLAG",
+    "--json MODE",
+    "<routine>!"
+  ],
+  "alexa-cli forget": [
+    "--apply FLAG",
+    "--force FLAG",
+    "--json MODE",
+    "<device>!"
+  ],
+  "alexa-cli login": [],
+  "alexa-cli logout": [],
+  "alexa-cli phrases": [
+    "--add LIST",
+    "--apply FLAG",
+    "--json MODE",
+    "--remove LIST",
+    "<routine>!"
+  ],
+  "alexa-cli retarget": [
+    "--apply FLAG",
+    "--device STRING",
+    "--from STRING",
+    "--json MODE",
+    "--op CHOICE(turnOn|turnOff)",
+    "<routine>!"
+  ],
+  "alexa-cli routines": [
+    "--json MODE",
+    "--plain MODE",
+    "<text>"
+  ],
+  "alexa-cli run": [
+    "--json MODE",
+    "--on STRING",
+    "<routine>!"
+  ],
+  "alexa-cli show": [
+    "--json MODE",
+    "<routine>!"
+  ],
+  "alexa-cli skills": [
+    "--json MODE",
+    "--plain MODE",
+    "<text>"
+  ],
+  "alexa-cli snapshot": [],
+  "alexa-cli status": [
+    "--json MODE"
+  ]
+}
