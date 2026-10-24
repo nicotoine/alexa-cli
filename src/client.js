@@ -2,7 +2,7 @@
 // network call of the CLI goes through this class.
 
 import AlexaRemote from 'alexa-remote2';
-import { loadAuth, saveAuth, PROXY_PORT } from './auth.js';
+import { loadAuth, loginDoneHtml, saveAuth, PROXY_PORT } from './auth.js';
 import { asciiJson, flattenAppliances, flattenEchos, LOCALE } from './model.js';
 
 // The Alexa app version the write endpoints expect (as sent by alexa-mcp). Without it writes are refused.
@@ -39,6 +39,7 @@ export function connect({ interactive = false, onLoginUrl = () => {}, debug = fa
             proxyOwnIp: '127.0.0.1',
             proxyPort: PROXY_PORT,
             proxyListenBind: '127.0.0.1',
+            proxyCloseWindowHTML: loginDoneHtml(),
             useWsMqtt: false,
             usePushConnection: false,
             notifications: false,

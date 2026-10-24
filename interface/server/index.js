@@ -14,6 +14,9 @@ const PUBLIC_DIR = fileURLToPath(new URL('../app/dist', import.meta.url));
 
 /** Starts the interface; resolves with the server once it listens. */
 export function start({ host = HOST, port = PORT, runner = createRunner(), publicDir = PUBLIC_DIR } = {}) {
+    // The login proxy's last page comes back here (src/auth.js loginDoneHtml); a CLI login spawned by the
+    // subprocess runner inherits it.
+    process.env.ALEXA_CLI_RETURN_TO ||= `http://${host}:${port}/`;
     const server = http.createServer(createApp({ runner, publicDir, host, port }));
     return new Promise((resolve, reject) => {
         server.once('error', reject);
