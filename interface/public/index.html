@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alexa routines</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%2300a8e1' stroke-width='4'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="ring" aria-hidden="true"></span>
+      <h1>Alexa</h1>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="routines" aria-selected="true">Routines</button>
+      <button role="tab" data-tab="devices">Appareils</button>
+      <button role="tab" data-tab="skills">Skills</button>
+      <button role="tab" data-tab="audit">Audit</button>
+    </nav>
+    <button class="ghost" id="refresh" title="Recharger depuis Alexa">Actualiser</button>
+  </header>
+
+  <main>
+    <section id="tab-routines" class="tab" role="tabpanel">
+      <div class="toolbar">
+        <input type="search" id="routine-filter" placeholder="Filtrer par nom, phrase ou appareil…" aria-label="Filtrer les routines">
+        <button class="primary" id="new-routine">Nouvelle routine</button>
+      </div>
+      <form id="create-form" class="panel" hidden>
+        <h2>Nouvelle routine vocale</h2>
+        <label>Phrases <span class="hint">une par ligne, la première sert de nom</span>
+          <textarea id="create-phrases" rows="3" required placeholder="pause télé&#10;mets la télé en pause"></textarea>
+        </label>
+        <div class="row">
+          <label>Appareil
+            <select id="create-device" required></select>
+          </label>
+          <label>Action
+            <select id="create-op">
+              <option value="turnOn">Allumer</option>
+              <option value="turnOff">Éteindre</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-cancel">Annuler</button>
+          <button type="submit" class="primary">Vérifier puis créer</button>
+        </div>
+      </form>
+      <div id="routines" class="cards" aria-live="polite"></div>
+    </section>
+
+    <section id="tab-devices" class="tab" role="tabpanel" hidden>
+      <div class="toolbar">
+        <input type="search" id="device-filter" placeholder="Filtrer les appareils…" aria-label="Filtrer les appareils">
+      </div>
+      <div class="table-wrap"><table id="devices"></table></div>
+    </section>
+
+    <section id="tab-skills" class="tab" role="tabpanel" hidden>
+      <p class="lead">Skills activées et appareils de maison connectée fournis par chacune. Un appareil qui
+        réapparaît ici après suppression vient d'une skill toujours liée.</p>
+      <div id="skills" class="cards"></div>
+    </section>
+
+    <section id="tab-audit" class="tab" role="tabpanel" hidden>
+      <p class="lead">Routines dont une action vise un appareil qui n'existe plus.</p>
+      <div id="audit" class="cards"></div>
+    </section>
+  </main>
+
+  <dialog id="confirm">
+    <form method="dialog">
+      <h2 id="confirm-title">Confirmer</h2>
+      <p class="hint">Simulation de la CLI : rien n'a encore été modifié.</p>
+      <pre id="confirm-plan"></pre>
+      <label class="check" id="confirm-force-row" hidden><input type="checkbox" id="confirm-force"> Forcer malgré les routines qui l'utilisent</label>
+      <div class="actions">
+        <button value="cancel" class="ghost">Annuler</button>
+        <button value="ok" class="danger" id="confirm-ok">Appliquer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

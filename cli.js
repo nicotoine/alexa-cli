@@ -34,6 +34,7 @@ Account
 Smart home
   devices [text]                devices routines can target (name, id)
   appliances [text] [--offline] devices with their source (Matter, skill) and reachability
+  skills [text]                 enabled skills and the smart-home devices each one provides
   forget <device> [--force] --apply
                                 delete a device from Alexa; refused while a routine uses it (--force overrides)
 
@@ -45,8 +46,9 @@ Routines (<routine> = name, phrase or id)
                                 voice routine that turns a device on (default) or off
   phrases <routine> [--add "<phrase>"...] [--remove "<phrase>"...] [--apply]
                                 add or remove the ways to say a routine
-  retarget <routine> --device "<device>" [--op turnOn|turnOff] [--apply]
-                                point a routine at another device (same id, phrases and name)
+  retarget <routine> --device "<device>" [--from "<device>"] [--op turnOn|turnOff] [--apply]
+                                point a routine at another device (same id, phrases and name); --from picks
+                                which device to replace when the routine controls several
   enable <routine> [--apply] / disable <routine> [--apply]
   run <routine> [--on "<echo name>"]
                                 run a routine now, as if it had been said to that Echo
@@ -54,7 +56,7 @@ Routines (<routine> = name, phrase or id)
   audit                         routines whose target device no longer exists
 
   Without --apply, commands that change something only print what they would do.
-  --json                        raw JSON output (devices, appliances, routines)`;
+  --json                        raw JSON output (devices, appliances, skills, routines, audit)`;
 
 const REPEATED = new Set(['phrase', 'add', 'remove']);
 const FLAGS = new Set(['apply', 'json', 'force', 'offline']);
@@ -163,6 +165,34 @@ async function appliances(alexa) {
     };
     walk(await viaCallback((cb) => alexa.getSmarthomeDevices(cb)));
     return [...found.values()];
+}
+
+// The skill behind a skill-provided appliance: driverIdentity.identifier is base64 JSON {"skillId", "stage"}.
+function skillIdOf(appliance) {
+    const id = appliance.driverIdentity;
+    if (!id || id.namespace !== 'SKILL' || !id.identifier) return null;
+    try {
+        return JSON.parse(Buffer.from(id.identifier, 'base64').toString('utf8')).skillId || null;
+    } catch {
+        return null;
+    }
+}
+
+// Enabled skills (Amazon's "your skills" page) merged with the skills that provide smart-home devices: the page
+// leaves most smart-home skills out (TCL, Smart Life, Tapo), the devices name them.
+async function skills(alexa) {
+    const byId = new Map();
+    const listed = await viaCallback((cb) => alexa.getSkills(cb)).catch(() => []);
+    for (const s of listed || []) byId.set(s.id, { id: s.id, name: s.name, type: s.type, enabled: true, devices: [] });
+    for (const a of await appliances(alexa)) {
+        const id = skillIdOf(a);
+        if (!id) continue;
+        if (!byId.has(id)) byId.set(id, { id, name: null, type: 'SMART_HOME', enabled: null, devices: [] });
+        const s = byId.get(id);
+        s.name = s.name || a.manufacturerName || null;
+        s.devices.push({ name: deviceName(a), applianceId: a.applianceId });
+    }
+    return [...byId.values()];
 }
 
 function deviceName(d) {
@@ -373,6 +403,18 @@ const commands = {
         console.log('deleted');
     },
 
+    async skills(alexa, args) {
+        const list = (await skills(alexa))
+            .filter((s) => !args._[1] || [s.name || '', s.id, ...s.devices.map((d) => d.name)]
+                .some((x) => x.toLowerCase().includes(args._[1].toLowerCase())))
+            .sort((a, b) => b.devices.length - a.devices.length || String(a.name).localeCompare(String(b.name)));
+        if (args.json) return console.log(JSON.stringify(list, null, 2));
+        for (const s of list) {
+            console.log(`${s.name || '(sans nom)'}\t${s.type || ''}\t${s.devices.length} appareil(s)\t${s.id}`);
+            s.devices.forEach((d) => console.log(`  - ${d.name}`));
+        }
+    },
+
     async routines(alexa, args) {
         const list = (await routines(alexa))
             .filter((r) => !args._[1] || [routineLabel(r), ...phrasesOf(r)].some((s) => s.toLowerCase().includes(args._[1].toLowerCase())));
@@ -434,9 +476,17 @@ const commands = {
         if (!args.device) throw new Error('retarget needs --device');
         if (args.op && !['turnOn', 'turnOff'].includes(args.op)) throw new Error('--op is turnOn or turnOff');
         const r = findRoutine(await routines(alexa), args._[1] || '');
-        const targets = routineTargets(r);
-        if (targets.length !== 1) throw new Error(`retarget needs a routine with exactly one device action (found ${targets.length})`);
-        const device = findByName(await smartHomeDevices(alexa), args.device, 'device');
+        const devices = await smartHomeDevices(alexa);
+        let targets = routineTargets(r);
+        if (args.from) {
+            const from = new Set(deviceIds(findByName([...devices, ...await appliances(alexa)], args.from, 'device')));
+            targets = targets.filter((t) => from.has(t.target));
+        }
+        if (targets.length !== 1) {
+            throw new Error(`retarget needs exactly one matching device action (found ${targets.length}); `
+                + 'name the device to replace with --from');
+        }
+        const device = findByName(devices, args.device, 'device');
         const to = deviceIds(device)[0];
         console.log(`"${routineLabel(r)}": ${targets[0].op} ${targets[0].target} -> ${args.op || targets[0].op} ${deviceName(device)}`);
         if (!args.apply) return console.log('(dry run: add --apply to do it)');
@@ -477,18 +527,20 @@ const commands = {
         console.log('deleted');
     },
 
-    async audit(alexa) {
+    async audit(alexa, args) {
         const [list, devs, apps] = await Promise.all([routines(alexa), smartHomeDevices(alexa), appliances(alexa)]);
         const known = new Set([...devs, ...apps].flatMap(deviceIds));
         const names = new Map([...devs, ...apps].flatMap((d) => deviceIds(d).map((id) => [id, deviceName(d)])));
-        let broken = 0;
-        for (const r of list) {
-            const missing = routineTargets(r).filter((t) => !known.has(t.target));
-            if (!missing.length) continue;
-            broken++;
-            console.log(`${routineLabel(r)}\t${r.automationId}\n  missing: ${missing.map((t) => `${t.op} ${names.get(t.target) || t.target}`).join(', ')}`);
+        const broken = list
+            .map((r) => ({ name: routineLabel(r), automationId: r.automationId,
+                missing: routineTargets(r).filter((t) => !known.has(t.target))
+                    .map((t) => ({ ...t, name: names.get(t.target) || null })) }))
+            .filter((r) => r.missing.length);
+        if (args.json) return console.log(JSON.stringify(broken, null, 2));
+        for (const r of broken) {
+            console.log(`${r.name}\t${r.automationId}\n  missing: ${r.missing.map((t) => `${t.op} ${t.name || t.target}`).join(', ')}`);
         }
-        console.log(broken ? `${broken} routine(s) point at devices that no longer exist` : 'no broken routine');
+        console.log(broken.length ? `${broken.length} routine(s) point at devices that no longer exist` : 'no broken routine');
     },
 };
 

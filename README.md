@@ -42,18 +42,33 @@ quelque chose **affiche seulement ce qui serait fait** tant que `--apply` n'est 
 |---|---|
 | `devices [texte]` | appareils qu'une routine peut viser (nom, identifiant) |
 | `appliances [texte]` | appareils avec leur source (`AAA` = Matter, `SKILL` = skill) |
+| `skills [texte]` | skills activées et appareils fournis par chacune (la page « Vos skills » d'Amazon oublie la plupart des skills de maison connectée : alexa-cli les retrouve par leurs appareils) |
 | `forget <appareil> [--force] --apply` | supprime un appareil d'Alexa ; refusé tant qu'une routine l'utilise |
 | `routines [texte]` | liste les routines |
 | `show <routine>` | JSON complet |
 | `create --phrase "…" [--phrase "…"] --device "…" [--op turnOn\|turnOff] [--name "…"] --apply` | routine vocale qui allume (par défaut) ou éteint un appareil |
 | `phrases <routine> [--add "…"] [--remove "…"] --apply` | ajoute ou retire des façons de dire la routine |
-| `retarget <routine> --device "…" [--op …] --apply` | même routine sur un autre appareil (même identifiant) |
+| `retarget <routine> --device "…" [--from "…"] [--op …] --apply` | même routine sur un autre appareil (même identifiant) ; `--from` choisit l'appareil à remplacer quand la routine en pilote plusieurs |
 | `enable <routine> --apply` / `disable <routine> --apply` | active / désactive |
 | `run <routine> [--on "<Echo>"]` | lance la routine maintenant |
 | `delete <routine> --apply` | supprime |
 | `audit` | routines dont l'appareil visé n'existe plus |
 
-`--json` donne la sortie brute pour `devices`, `appliances` et `routines`.
+`--json` donne la sortie brute pour `devices`, `appliances`, `skills`, `routines` et `audit`.
+
+## Interface web
+
+```bash
+npm run ui        # http://127.0.0.1:3457/
+```
+
+Une page locale par-dessus la CLI : routines (filtre, phrases à ajouter ou retirer, activer, lancer,
+changer d'appareil, supprimer, créer), appareils avec les routines qui les utilisent, skills, audit.
+Chaque modification passe par la simulation de la CLI, affichée avant de confirmer.
+
+Le serveur (`interface/server.js`, sans dépendance) n'écoute que sur `127.0.0.1`, refuse les autres noms
+d'hôte, n'exécute que les commandes de sa liste blanche et passe les arguments à `cli.js` sans shell.
+Les écritures exigent un en-tête `X-Alexa-Cli` qu'une page d'un autre site ne peut pas envoyer.
 
 ## Exemples
 
