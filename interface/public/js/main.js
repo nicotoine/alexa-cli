@@ -1,7 +1,7 @@
 // Boot: the store, the streamed snapshot, the sync indicator, and the wiring of the controls.
 
 import { createActions } from './actions.js';
-import { change, snapshot } from './api.js';
+import { change, login, session, snapshot } from './api.js';
 import { $, el } from './dom.js';
 import { ROUTINE_SORTS, SKILL_SORTS, deviceFacets, nextDeviceSort, routineDevices, skillTypes } from './listing.js';
 import { label, phraseOwner } from './model.js';
@@ -110,7 +110,8 @@ async function load({ silent = false } = {}) {
         try {
             for await (const msg of snapshot()) {
                 if (msg.kind === 'error') {
-                    toast(`Chargement incomplet (${msg.data.kind})`, { type: 'error', detail: explain(msg.data.message) });
+                    if (NEEDS_LOGIN.test(msg.data.message)) needLogin();
+                    else toast(`Chargement incomplet (${msg.data.kind})`, { type: 'error', detail: explain(msg.data.message) });
                     continue;
                 }
                 store.receive(msg.kind, msg.data, { cached: Boolean(msg.cached), since });
@@ -128,6 +129,54 @@ async function load({ silent = false } = {}) {
     })();
     return loading;
 }
+
+// ---- signing in from the page (there is no terminal on a phone) -----------------------------------------------
+
+const NEEDS_LOGIN = /not logged in|401|Unauthorized|Cookie invalid|alexa-cli login/i;
+let loginPoll = null;
+
+function needLogin() {
+    if (document.body.classList.contains('needs-login')) return;
+    document.body.classList.add('needs-login');
+    $('#login-panel').hidden = false;
+    showSync('error', 'Non connecté');
+    // The login page may be in another tab, or the user comes back to this one: check now and then.
+    loginPoll = setInterval(checkSession, 4000);
+}
+
+async function checkSession() {
+    if (document.visibilityState !== 'visible') return;
+    try {
+        if ((await session()).valid) loggedIn();
+    } catch {
+        // The server restarts or is busy: try again at the next tick.
+    }
+}
+
+function loggedIn() {
+    clearInterval(loginPoll);
+    document.body.classList.remove('needs-login');
+    $('#login-panel').hidden = true;
+    toast('Connecté à Amazon', { type: 'success' });
+    load();
+}
+
+$('#login-button').addEventListener('click', async () => {
+    const button = $('#login-button');
+    button.disabled = true;
+    try {
+        const started = await login();
+        if (started.loggedIn) return loggedIn();
+        // Amazon's own login page, through the proxy on this device. Back from it, pageshow checks the session.
+        window.location.href = started.url;
+    } catch (e) {
+        toast('Impossible de lancer la connexion', { type: 'error', detail: explain(e.message) });
+    } finally {
+        button.disabled = false;
+    }
+});
+window.addEventListener('pageshow', () => { if (document.body.classList.contains('needs-login')) checkSession(); });
+document.addEventListener('visibilitychange', () => { if (document.body.classList.contains('needs-login')) checkSession(); });
 
 // Once every change in flight is answered, reload quietly so the page matches Amazon again.
 let resyncTimer;

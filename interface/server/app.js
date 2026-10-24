@@ -3,6 +3,8 @@
 //
 //   GET  /api/snapshot     every list, as JSON lines streamed as they arrive (a cached copy first)
 //   POST /api/do/<command> one change, dry run unless {"apply": true}; answers the CLI's --json document
+//   GET  /api/session      whether a session is stored and accepted
+//   POST /api/login        starts the Amazon login; answers the local page to sign in on
 //   GET  /…                the page (interface/public)
 
 import fs from 'node:fs';
@@ -67,12 +69,24 @@ export function createApp({ runner, publicDir, host, port }) {
         });
     }
 
-    async function change(req, res, command) {
-        // A custom header and a JSON body: a page on another site cannot send this without a CORS preflight, which
-        // this server never answers.
-        if (req.headers['x-alexa-cli'] !== '1' || !String(req.headers['content-type']).startsWith('application/json')) {
-            return send(res, 403, { error: 'forbidden' });
+    // A custom header and a JSON body: a page on another site cannot send this without a CORS preflight, which this
+    // server never answers.
+    const trusted = (req) => req.headers['x-alexa-cli'] === '1' && String(req.headers['content-type']).startsWith('application/json');
+
+    async function login(req, res) {
+        if (!trusted(req)) return send(res, 403, { error: 'forbidden' });
+        try {
+            const started = await runner.login();
+            // A new session: the lists cached for the old one must not be shown first any more.
+            if (started.loggedIn) cache.clear();
+            return send(res, 200, started);
+        } catch (e) {
+            return send(res, 502, { error: e.message });
         }
+    }
+
+    async function change(req, res, command) {
+        if (!trusted(req)) return send(res, 403, { error: 'forbidden' });
         let argv;
         try {
             argv = writeArgv(command, JSON.parse((await readBody(req)) || '{}'));
@@ -100,6 +114,8 @@ export function createApp({ runner, publicDir, host, port }) {
         const { pathname } = new URL(req.url, `http://${hostHeader}`);
         try {
             if (req.method === 'GET' && pathname === '/api/snapshot') return snapshot(req, res);
+            if (req.method === 'GET' && pathname === '/api/session') return send(res, 200, await runner.session());
+            if (req.method === 'POST' && pathname === '/api/login') return await login(req, res);
             if (req.method === 'POST' && pathname.startsWith('/api/do/')) return await change(req, res, pathname.slice('/api/do/'.length));
             if (req.method === 'GET' && !pathname.startsWith('/api/')) return file(res, pathname);
             return send(res, pathname.startsWith('/api/') ? 404 : 405, { error: 'not found' });

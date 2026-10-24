@@ -24,6 +24,14 @@
   </header>
 
   <main>
+    <section id="login-panel" class="panel login" hidden>
+      <h2>Connexion à Amazon</h2>
+      <p>Pour lire et modifier tes routines, connecte-toi une fois à ton compte Amazon. La page de connexion est celle
+        d'Amazon, servie par l'application sur cet appareil : le mot de passe n'est jamais conservé, seuls les jetons
+        de session le sont.</p>
+      <p class="hint">Une fois connecté, reviens en arrière : la page se met à jour toute seule.</p>
+      <div class="actions"><button class="primary" id="login-button">Se connecter à Amazon</button></div>
+    </section>
     <section id="tab-routines" class="tab" role="tabpanel">
       <div class="toolbar">
         <input type="search" id="routine-filter" data-pref="routines.text" placeholder="Filtrer par nom, phrase ou appareil…" aria-label="Filtrer les routines">

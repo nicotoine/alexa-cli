@@ -21,6 +21,12 @@ const runner = {
         onLine('{"kind":"error","data":{"kind":"skills","message":"slow"}}');
         return { done: Promise.resolve({ ok: true }), abort() {} };
     },
+    async session() {
+        return { stored: true, valid: false, loggingIn: false };
+    },
+    async login() {
+        return { url: 'http://127.0.0.1:3456/' };
+    },
 };
 
 let server;
@@ -81,6 +87,19 @@ describe('protections', () => {
         const r = await request('/');
         assert.equal(r.status, 200);
         assert.match(r.headers['content-security-policy'], /default-src 'self'/);
+    });
+});
+
+describe('session and login', () => {
+    it('says whether a session is accepted', async () => {
+        assert.deepEqual(JSON.parse((await request('/api/session')).body), { stored: true, valid: false, loggingIn: false });
+    });
+
+    it('starts a login only with the custom header', async () => {
+        const refused = await request('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+        assert.equal(refused.status, 403);
+        const started = await request('/api/login', { method: 'POST', headers: { 'content-type': 'application/json', 'x-alexa-cli': '1' }, body: '{}' });
+        assert.deepEqual(JSON.parse(started.body), { url: 'http://127.0.0.1:3456/' });
     });
 });
 

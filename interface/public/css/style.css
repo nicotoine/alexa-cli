@@ -313,3 +313,9 @@ tr.pending td { opacity: .5; }
   .filters .count { margin-left: 0; }
   .chip button { padding: 4px 8px; }
 }
+
+/* Not signed in: only the login panel shows. */
+body.needs-login .tab, body.needs-login .tabs, body.needs-login #refresh { display: none !important; }
+.login { max-width: 560px; margin: 24px auto; }
+.login p { margin: 0; color: var(--text); }
+.login .hint { color: var(--muted); }

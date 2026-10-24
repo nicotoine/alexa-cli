@@ -49,7 +49,8 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
     }
 
     const out = createOutput({ mode: input.opts.json ? 'json' : input.opts.plain ? 'plain' : 'human', stdout, stderr });
-    const ctx = { ...createContext({ out, opts: input.opts, ...(connectFn ? { connectFn } : {}) }), prog: PROG, commands: COMMANDS };
+    // stdout is passed down for the commands that stream raw lines (snapshot): in-process callers capture it.
+    const ctx = { ...createContext({ out, opts: input.opts, ...(connectFn ? { connectFn } : {}) }), prog: PROG, commands: COMMANDS, stdout };
     try {
         const code = await command.run(ctx, input);
         return typeof code === 'number' ? code : 0;

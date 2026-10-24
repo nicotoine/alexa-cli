@@ -19,6 +19,20 @@ export async function* snapshot(fetchFn = fetch) {
     }
 }
 
+export async function session(fetchFn = fetch) {
+    const res = await fetchFn('/api/session');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+/** Starts the Amazon login; resolves to { url } (the page to sign in on) or { loggedIn: true }. */
+export async function login(fetchFn = fetch) {
+    const res = await fetchFn('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Alexa-Cli': '1' }, body: '{}' });
+    const doc = await res.json().catch(() => ({ error: res.statusText }));
+    if (!res.ok) throw new Error(doc.error || `HTTP ${res.status}`);
+    return doc;
+}
+
 /**
  * One change through the CLI. Resolves to the CLI's --json answer; rejects with the CLI's own message when it
  * refused (the message the toast shows).

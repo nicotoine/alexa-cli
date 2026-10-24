@@ -8,7 +8,7 @@ const completion = {
     summary: 'Print the shell completion script (bash, zsh or fish)',
     args: [{ name: 'shell', required: true, help: 'bash, zsh or fish' }],
     async run(ctx, { args }) {
-        process.stdout.write(completionScript(args.shell, ctx.prog, ctx.commands));
+        ctx.stdout.write(completionScript(args.shell, ctx.prog, ctx.commands));
     },
 };
 

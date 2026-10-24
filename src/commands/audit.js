@@ -30,7 +30,7 @@ const snapshot = {
     group: 'Checks',
     summary: 'All lists over one connection, one JSON line per part as it is ready',
     async run(ctx) {
-        const emit = (kind, data) => process.stdout.write(`${JSON.stringify({ kind, data })}\n`);
+        const emit = (kind, data) => ctx.stdout.write(`${JSON.stringify({ kind, data })}\n`);
         const client = await ctx.client();
         const part = (kind, promise) => promise.then(
             (data) => (emit(kind, data), data),
