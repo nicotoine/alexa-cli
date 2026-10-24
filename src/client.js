@@ -3,7 +3,7 @@
 
 import AlexaRemote from 'alexa-remote2';
 import { loadAuth, saveAuth, PROXY_PORT } from './auth.js';
-import { asciiJson, flattenAppliances, LOCALE } from './model.js';
+import { asciiJson, flattenAppliances, flattenEchos, LOCALE } from './model.js';
 
 // The Alexa app version the write endpoints expect (as sent by alexa-mcp). Without it writes are refused.
 const ROUTINES_VERSION = '3.0.264101';
@@ -101,8 +101,9 @@ export class AlexaClient {
         return (await this.callback((cb) => this.remote.getSkills(cb)).catch(() => [])) || [];
     }
 
+    // Echos, Fire TVs and the Alexa app on each phone (see flattenEchos).
     async echos() {
-        return ((await this.callback((cb) => this.remote.getDevices(cb))) || {}).devices || [];
+        return flattenEchos(((await this.callback((cb) => this.remote.getDevices(cb))) || {}).devices || []);
     }
 
     // ---- writes

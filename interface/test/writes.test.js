@@ -14,6 +14,12 @@ describe('writeArgv', () => {
         assert.deepEqual(writeArgv('forget', { target: 'x', force: true, apply: true }), ['forget', 'x', '--force', '--apply', '--json']);
     });
 
+    it('passes a spec as JSON, object or string, with its own size limit', () => {
+        const spec = { when: { say: ['-commence par un tiret'] }, do: [{ wait: 1 }] };
+        assert.deepEqual(writeArgv('update', { target: 'r1', spec, apply: true }), ['update', 'r1', '--spec', JSON.stringify(spec), '--apply', '--json']);
+        assert.throws(() => writeArgv('create', { spec: 'x'.repeat(33 * 1024) }), /spec too large/);
+    });
+
     it('never adds --apply to run, which acts at once', () => {
         assert.deepEqual(writeArgv('run', { target: 'r1', apply: true }), ['run', 'r1', '--json']);
     });

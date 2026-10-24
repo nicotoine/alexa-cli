@@ -28,7 +28,7 @@ it('changed no parameter', () => {
 });
 
 it('declares --apply on every command that changes something, and on nothing else', () => {
-    const writes = ['create', 'phrases', 'retarget', 'enable', 'disable', 'delete', 'forget'];
+    const writes = ['create', 'update', 'phrases', 'retarget', 'enable', 'disable', 'delete', 'forget'];
     const withApply = COMMANDS.filter((c) => (c.options || []).some((o) => o.name === 'apply')).map((c) => c.name);
     assert.deepEqual(withApply.sort(), writes.sort());
 });

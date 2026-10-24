@@ -79,12 +79,58 @@ A `<routine>` is named by its name, one of its phrases or its id. A `<device>` b
 |---|---|
 | `routines [text]` | list, filtered on name and phrases |
 | `show <routine>` | the full JSON Amazon returns |
-| `create --phrase "…" [--phrase "…"…] --device "…" [--op turnOn\|turnOff] [--name "…"]` | voice routine that turns a device on (default) or off |
+| `export <routine>` | the routine as an editable spec (below) |
+| `create --from spec.json` / `--spec '<json>'` | create a routine from a spec |
+| `update <routine> --from spec.json` | replace a routine with a spec, keeping its id |
+| `create --phrase "…" [--phrase "…"…] --device "…" [--op turnOn\|turnOff] [--name "…"]` | quick form: a phrase that turns a device on (default) or off |
 | `phrases <routine> [--add "…"]… [--remove "…"]…` | add or remove ways to say it |
 | `retarget <routine> --device "…" [--from "…"] [--op …]` | same routine on another device — same id, phrases and other actions; `--from` picks which device to replace when there are several |
 | `enable <routine>` / `disable <routine>` | switch on / off |
 | `run <routine> [--on "<Echo>"]` | run it now, as if it had been said |
 | `delete <routine>` | delete |
+
+### Routine specs
+
+A routine with several actions, a schedule, an Echo that answers — written as JSON, the way `export` prints it:
+
+```json
+{
+  "name": "bonne nuit",
+  "enabled": true,
+  "when": { "say": ["bonne nuit", "au dodo"] },
+  "do": [
+    { "device": "Télé", "turn": "off" },
+    { "device": "Lumière salon", "turn": "off" },
+    { "say": "Bonne nuit, fais de beaux rêves" },
+    { "wait": 10 },
+    { "play": "weather", "on": "Chambre" },
+    { "command": "mets de la musique douce", "on": "Chambre" }
+  ]
+}
+```
+
+| | |
+|---|---|
+| `when` | `{ "say": [phrases] }`, or `{ "at": "HH:MM", "days": ["MO","TU","WE","TH","FR","SA","SU"] }` (no `days`: every day) |
+| `{ "device": "…", "turn": "on" \| "off" }` | a smart-home device, by name |
+| `{ "say": "…" }` | Alexa says it |
+| `{ "wait": seconds }` | 1 to 3600 |
+| `{ "play": "weather" \| "time" \| "date" \| "calendar" \| "news" \| "goodmorning" }` | |
+| `{ "command": "…" }` | as if said to Alexa |
+| `{ "fireTv": "off", "on": "<Fire TV>" }` | |
+| `{ "raw": { "type", "skillId", "payload" } }` | any other action, kept as Amazon wrote it — export → import loses nothing |
+| `"on": "<Echo>"` | which Echo answers (name, or serial number for the Alexa app on a phone). Default: the one that heard the phrase; **required** on a schedule, which has none |
+
+**Actions run in order, and Amazon makes the groups.** Whatever nesting is sent, Amazon stores a flat list and runs
+each run of consecutive device actions *together with the one action that follows it* (observed on a real account:
+two `say` sent "together" came back one after the other). So a spec is a flat list; `together` / `steps` blocks
+are accepted but flattened, and the dry run says so.
+
+```bash
+alexa-cli export "on va dormir" > dormir.json   # edit it
+alexa-cli update "on va dormir" --from dormir.json           # dry run: what would be written
+alexa-cli update "on va dormir" --from dormir.json --apply
+```
 
 ### Smart home
 

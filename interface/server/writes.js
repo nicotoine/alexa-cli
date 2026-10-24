@@ -4,7 +4,8 @@
 export class BadRequest extends Error {}
 
 export const WRITES = {
-    create: { positional: false, options: ['phrase', 'device', 'op', 'name'] },
+    create: { positional: false, options: ['spec', 'phrase', 'device', 'op', 'name'] },
+    update: { positional: true, options: ['spec'] },
     phrases: { positional: true, options: ['add', 'remove'] },
     retarget: { positional: true, options: ['device', 'from', 'op'] },
     enable: { positional: true, options: [] },
@@ -18,6 +19,8 @@ export const WRITES = {
 const LISTS = new Set(['phrase', 'add', 'remove']);
 const FLAGS = new Set(['force']);
 const MAX_LENGTH = 300;
+// A spec is a whole routine: far longer than a name, and JSON the CLI parses itself.
+const MAX_SPEC = 32 * 1024;
 const MAX_ITEMS = 30;
 
 function text(value, what) {
@@ -36,7 +39,11 @@ export function writeArgv(command, body = {}) {
     for (const key of spec.options) {
         const value = body[key];
         if (value === undefined || value === null || value === '' || value === false) continue;
-        if (FLAGS.has(key)) {
+        if (key === 'spec') {
+            const json = typeof value === 'string' ? value : JSON.stringify(value);
+            if (json.length > MAX_SPEC) throw new BadRequest('spec too large');
+            argv.push('--spec', json);
+        } else if (FLAGS.has(key)) {
             if (value !== true) throw new BadRequest(`invalid ${key}`);
             argv.push(`--${key}`);
         } else if (LISTS.has(key)) {

@@ -14,10 +14,12 @@
   "alexa-cli create": [
     "--apply FLAG",
     "--device STRING",
+    "--from STRING",
     "--json MODE",
     "--name STRING",
     "--op CHOICE(turnOn|turnOff)",
-    "--phrase LIST"
+    "--phrase LIST",
+    "--spec STRING"
   ],
   "alexa-cli delete": [
     "--apply FLAG",
@@ -37,6 +39,9 @@
   "alexa-cli enable": [
     "--apply FLAG",
     "--json MODE",
+    "<routine>!"
+  ],
+  "alexa-cli export": [
     "<routine>!"
   ],
   "alexa-cli forget": [
@@ -84,5 +89,12 @@
   "alexa-cli snapshot": [],
   "alexa-cli status": [
     "--json MODE"
+  ],
+  "alexa-cli update": [
+    "--apply FLAG",
+    "--from STRING",
+    "--json MODE",
+    "--spec STRING",
+    "<routine>!"
   ]
 }

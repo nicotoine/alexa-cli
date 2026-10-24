@@ -67,6 +67,24 @@ export function flattenAppliances(raw) {
     return [...found.values()];
 }
 
+/**
+ * Echos and the Alexa apps that can answer an action. Amazon lists the Alexa app on each phone only inside
+ * another device's appDeviceList, with no name: they are added under their serial number, which is how a
+ * routine names them (a "good morning" played on the phone, made in the app, targets one).
+ */
+export function flattenEchos(devices) {
+    const seen = new Map();
+    for (const d of devices || []) {
+        if (d.serialNumber) seen.set(d.serialNumber, d);
+        for (const app of d.appDeviceList || []) {
+            if (app.serialNumber && !seen.has(app.serialNumber)) {
+                seen.set(app.serialNumber, { ...app, accountName: null, deviceFamily: 'ALEXA_APP' });
+            }
+        }
+    }
+    return [...seen.values()];
+}
+
 export function applianceSource(a) {
     const prefix = String(a.applianceId).split('_')[0];
     return { AAA: 'matter', SKILL: 'skill' }[prefix] || prefix.toLowerCase();

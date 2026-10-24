@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-    asciiJson, brokenRoutines, checkPhrasesFree, customerIdOf, editedPhrases, findByName, findRoutine, flattenAppliances,
+    asciiJson, brokenRoutines, flattenEchos, checkPhrasesFree, customerIdOf, editedPhrases, findByName, findRoutine, flattenAppliances,
     idsOfName, mergeSkills, phrasesOf, rebuildBody, routineTargets, skillIdOf, utteranceTrigger, writeBody,
 } from '../src/model.js';
 import { APPLIANCES, CUSTOMER, ENTITIES, bedtime, routines } from './fixtures.js';
@@ -79,6 +79,19 @@ describe('devices and skills', () => {
         assert.equal(skillIdOf(APPLIANCES[0]), null);
         const merged = mergeSkills([{ id: 'amzn1.ask.skill.radio', name: 'Radio France', type: 'MUSIC' }], APPLIANCES);
         assert.deepEqual(merged.map((s) => [s.name, s.devices.length, s.listed]), [['TCL', 1, false], ['Radio France', 0, true]]);
+    });
+});
+
+describe('echos', () => {
+    it('adds the unnamed Alexa apps listed inside another device, once each', () => {
+        const echos = flattenEchos([
+            { serialNumber: 'E1', accountName: 'Salon', appDeviceList: [] },
+            { serialNumber: 'APP-SELF', accountName: 'This Device', appDeviceList: [
+                { serialNumber: 'PHONE', deviceType: 'A2TF17PFR55MTB', deviceAccountId: 'ACC' },
+                { serialNumber: 'APP-SELF', deviceType: 'A2IVLV5VM2W81' },
+            ] },
+        ]);
+        assert.deepEqual(echos.map((e) => [e.serialNumber, e.accountName]), [['E1', 'Salon'], ['APP-SELF', 'This Device'], ['PHONE', null]]);
     });
 });
 

@@ -117,6 +117,60 @@ describe('acting', () => {
     });
 });
 
+describe('specs', () => {
+    const spec = {
+        name: 'bonne nuit',
+        when: { say: ['bonne nuit à tous'] },
+        do: [{ device: 'Télé', turn: 'off' }, { together: [{ say: 'Bonne nuit', on: 'Salon' }, { wait: 5 }] }],
+    };
+
+    it('exports a routine as a spec that create accepts back', async () => {
+        const r = await cli(['export', 'on va dormir'], fakeClient());
+        assert.equal(r.code, 0, r.stderr);
+        const exported = JSON.parse(r.stdout);
+        assert.deepEqual(exported.when, { say: ['on va dormir', 'bonne nuit'] });
+        assert.deepEqual(exported.do[0], { device: 'Smart TV', turn: 'off' });
+    });
+
+    it('creates from an inline spec, every action validated', async () => {
+        const client = fakeClient();
+        const r = await cli(['create', '--spec', JSON.stringify(spec), '--apply', '--json'], client);
+        assert.equal(r.code, 0, r.stdout);
+        assert.match(r.json().plan, /- turn off Télé\n {2}- say "Bonne nuit" \(on Salon\)\n {2}- wait 5s\n {2}\(groups flattened/);
+        assert.equal(written(client, 'validate').length, 3);
+        // Sent flat, in order: Amazon makes its own groups and does not keep ours.
+        const sequence = JSON.parse(written(client, 'create')[0][1].sequenceJson);
+        assert.deepEqual(sequence.startNode.nodesToExecute.map((n) => n.type), ['Alexa.SmartHome.Batch', 'Alexa.Speak', 'Alexa.System.Wait']);
+    });
+
+    it('describes the spec and writes nothing without --apply', async () => {
+        const client = fakeClient();
+        const r = await cli(['create', '--spec', JSON.stringify(spec)], client);
+        assert.match(r.stdout, /create "bonne nuit" when said: "bonne nuit à tous"\n {2}- turn off Télé/);
+        assert.deepEqual(client.calls, []);
+    });
+
+    it('updates a routine in place from a spec, its own phrases allowed', async () => {
+        const client = fakeClient();
+        const mine = { ...spec, when: { say: ['pause télé', 'pause'] } };
+        const r = await cli(['update', 'pause télé', '--spec', JSON.stringify(mine), '--apply'], client);
+        assert.equal(r.code, 0, r.stderr);
+        assert.equal(written(client, 'update')[0][1].behaviorId, 'amzn1.alexa.automation.pause');
+    });
+
+    it('refuses a spec that is not JSON, or does not hold together, before connecting', async () => {
+        const bad = await cli(['create', '--spec', '{nope', '--json'], new Error('must not connect'));
+        assert.match(bad.json().error, /not valid JSON/);
+        const incomplete = await cli(['create', '--spec', JSON.stringify({ when: { at: '07:00' }, do: [{ say: 'hi' }] }), '--json'], fakeClient());
+        assert.match(incomplete.json().error, /needs "on"/);
+    });
+
+    it('refuses mixing a spec and the quick form', async () => {
+        const r = await cli(['create', '--spec', '{}', '--phrase', 'x'], fakeClient());
+        assert.equal(r.code, 2);
+    });
+});
+
 describe('failures', () => {
     it('says how to log in when no session is stored', async () => {
         const r = await cli(['routines', '--json'], new NotLoggedIn());

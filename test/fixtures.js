@@ -76,7 +76,7 @@ export function fakeClient({ routineList = routines(), entities = ENTITIES, appl
         entities: async () => structuredClone(entities),
         appliances: async () => structuredClone(appliances),
         listedSkills: async () => [{ id: 'amzn1.ask.skill.radio', name: 'Radio France', type: 'MUSIC' }],
-        echos: async () => [{ serialNumber: 'ECHO1', accountName: 'Salon', deviceFamily: 'ECHO' }],
+        echos: async () => [{ serialNumber: 'ECHO1', accountName: 'Salon', deviceFamily: 'ECHO', deviceType: 'A2TF17PFR55MTB' }],
         validate: async (type, payload) => {
             calls.push(['validate', type, payload]);
             return payload;

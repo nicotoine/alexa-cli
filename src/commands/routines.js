@@ -1,13 +1,16 @@
-// Voice routines: list, read, create, edit (phrases, device, on/off), run and delete.
+// Routines: list, read, export as a spec, create or replace from a spec, edit (phrases, device, on/off), run and
+// delete.
 // Every edit is a full rebuild of the routine and a PUT — the app has no partial update — so a routine keeps its
 // id, its other actions and its other phrases.
 
-import { APPLY } from '../args.js';
+import fs from 'node:fs';
+import { APPLY, UsageError } from '../args.js';
 import { act } from '../context.js';
 import {
     OPERATIONS, checkPhrasesFree, customerIdOf, deviceIds, deviceName, editedPhrases, findByName, findRoutine, idsOfName,
-    phrasesOf, rebuildBody, routineLabel, routineTargets, smartHomeOperation, smartHomeSequence, utteranceTrigger, writeBody,
+    phrasesOf, rebuildBody, routineLabel, routineTargets,
 } from '../model.js';
+import { SpecError, checkSpec, flatSteps, fromSpec, specHasGroups, specPhrases, toSpec, writeSpecBody } from '../routine-spec.js';
 
 const ROUTINE = { name: 'routine', required: true, help: 'Routine name, one of its phrases, or its id' };
 const quote = (list) => list.map((p) => `"${p}"`).join(', ');
@@ -52,11 +55,78 @@ const show = {
     },
 };
 
+// A spec from --from FILE ("-" reads stdin) or --spec JSON (what the web interface sends).
+function readSpec(opts) {
+    if (opts.from && opts.spec) throw new UsageError('give --from or --spec, not both');
+    let text;
+    try {
+        text = opts.spec !== undefined ? opts.spec : fs.readFileSync(opts.from === '-' ? 0 : opts.from, 'utf8');
+    } catch (e) {
+        throw new Error(`cannot read ${opts.from}: ${e.message}`);
+    }
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        throw new SpecError(`the spec is not valid JSON: ${e.message}`);
+    }
+}
+
+const STEP_WORDS = { on: 'allumer', off: 'éteindre' };
+
+/** One line per step, indented by nesting: what the dry run shows before a spec is written. */
+export function describeSpec(spec) {
+    const when = spec.when.say !== undefined ? `when said: ${quote([].concat(spec.when.say))}`
+        : spec.when.at !== undefined ? `at ${spec.when.at}${spec.when.days ? ` on ${spec.when.days.join(',')}` : ' every day'}` : 'when: (kept as is)';
+    const lines = [];
+    const walk = (steps, depth) => steps.forEach((s) => {
+        const pad = '  '.repeat(depth);
+        const on = s.on ? ` (on ${s.on})` : '';
+        if (s.device !== undefined) return lines.push(`${pad}- turn ${s.turn} ${s.device}`);
+        if (s.say !== undefined) return lines.push(`${pad}- say "${s.say}"${on}`);
+        if (s.wait !== undefined) return lines.push(`${pad}- wait ${s.wait}s`);
+        if (s.play !== undefined) return lines.push(`${pad}- play ${s.play}${on}`);
+        if (s.command !== undefined) return lines.push(`${pad}- tell Alexa "${s.command}"${on}`);
+        if (s.fireTv !== undefined) return lines.push(`${pad}- turn off Fire TV${on}`);
+        return lines.push(`${pad}- ${s.raw.type} (kept as is)`);
+    });
+    walk(flatSteps(spec.do), 1);
+    if (specHasGroups(spec)) lines.push('  (groups flattened: Amazon runs actions in order, each run of device actions together with the next one)');
+    return [`"${spec.name || [].concat(spec.when.say || [])[0] || 'routine'}" ${spec.enabled === false ? '(disabled) ' : ''}${when}`, ...lines].join('\n');
+}
+
+async function writeSpec(ctx, { spec, existing = null }) {
+    checkSpec(spec);
+    const client = await ctx.client();
+    const [all, entities, echos] = await Promise.all([client.routines(), client.entities(), client.echos()]);
+    checkPhrasesFree(all, specPhrases(spec), existing ? all.find((r) => r.automationId === existing.automationId) : null);
+    const routine = fromSpec(spec, { devices: entities, echos, customerId: customerIdOf(all) });
+    await act(ctx, {
+        plan: `${existing ? `update "${routineLabel(existing)}"` : 'create'} ${describeSpec(spec)}`,
+        details: { spec, ...(existing ? { automationId: existing.automationId } : {}) },
+        run: async () => {
+            const body = await writeSpecBody(routine, validator(client), existing && existing.automationId);
+            if (existing) {
+                await client.updateRoutine(body);
+                return `updated ${existing.automationId}`;
+            }
+            return `created ${(await client.createRoutine(body)).automationId}`;
+        },
+    });
+}
+
+const SPEC_OPTIONS = [
+    { name: 'from', type: 'string', metavar: 'FILE', help: 'The routine as a JSON spec ("-": stdin; see "export")' },
+    { name: 'spec', type: 'string', metavar: 'JSON', help: 'The same spec, inline' },
+];
+
 const create = {
     name: 'create',
     group: 'Routines',
-    summary: 'Create a voice routine that turns a device on or off',
+    summary: 'Create a routine: from a spec, or a phrase that turns a device on or off',
+    description: 'A spec chains actions, in order or together, on a phrase or a schedule — see the README.\n'
+        + 'Quick form: --phrase "…" --device "…" [--op turnOff].',
     options: [
+        ...SPEC_OPTIONS,
         { name: 'phrase', type: 'list', metavar: 'TEXT', help: 'What you say (repeat for other ways to say it)' },
         { name: 'device', type: 'string', metavar: 'NAME', help: 'Device to control (see "devices")' },
         { name: 'op', type: 'choice', choices: OPERATIONS, help: 'turnOn (default) or turnOff' },
@@ -65,26 +135,40 @@ const create = {
     ],
     modes: ['json'],
     async run(ctx, { opts }) {
-        if (!opts.phrase.length) throw new Error('create needs at least one --phrase');
+        if (opts.from !== undefined || opts.spec !== undefined) {
+            if (opts.phrase.length || opts.device) throw new UsageError('give a spec or --phrase/--device, not both');
+            return writeSpec(ctx, { spec: readSpec(opts) });
+        }
+        if (!opts.phrase.length) throw new Error('create needs --from, --spec or at least one --phrase');
         if (!opts.device) throw new Error('create needs --device');
-        const op = opts.op || 'turnOn';
-        const client = await ctx.client();
-        const [all, entities] = await Promise.all([client.routines(), client.entities()]);
-        const device = findByName(entities, opts.device);
-        checkPhrasesFree(all, opts.phrase);
-        const name = opts.name || opts.phrase[0];
-        await act(ctx, {
-            plan: `create "${name}": ${quote(opts.phrase)} -> ${op} ${deviceName(device)}`,
-            details: { routine: { name, phrases: opts.phrase, op, device: deviceName(device) } },
-            run: async () => {
-                const customerId = customerIdOf(all);
-                const operation = await client.validate('Alexa.SmartHome.Batch', smartHomeOperation({ target: deviceIds(device)[0], op, customerId }));
-                const res = await client.createRoutine(writeBody({
-                    name, status: 'ENABLED', triggers: [utteranceTrigger(opts.phrase, customerId)], sequence: smartHomeSequence(operation),
-                }));
-                return `created ${res.automationId}`;
-            },
-        });
+        const turn = (opts.op || 'turnOn') === 'turnOn' ? 'on' : 'off';
+        return writeSpec(ctx, { spec: { name: opts.name || opts.phrase[0], when: { say: opts.phrase }, do: [{ device: opts.device, turn }] } });
+    },
+};
+
+const update = {
+    name: 'update',
+    group: 'Routines',
+    summary: 'Replace a routine with a spec, keeping its id',
+    args: [ROUTINE],
+    options: [...SPEC_OPTIONS, APPLY],
+    modes: ['json'],
+    async run(ctx, { args, opts }) {
+        if (opts.from === undefined && opts.spec === undefined) throw new UsageError('update needs --from or --spec');
+        const { routine } = await routineAndClient(ctx, args.routine);
+        return writeSpec(ctx, { spec: readSpec(opts), existing: routine });
+    },
+};
+
+const exportRoutine = {
+    name: 'export',
+    group: 'Routines',
+    summary: 'A routine as an editable JSON spec (for create/update --from)',
+    args: [ROUTINE],
+    async run(ctx, { args }) {
+        const { client, routine } = await routineAndClient(ctx, args.routine);
+        const [entities, appliances, echos] = await Promise.all([client.entities(), client.appliances(), client.echos()]);
+        ctx.stdout.write(`${JSON.stringify(toSpec(routine, { devices: [...entities, ...appliances], echos }), null, 2)}\n`);
     },
 };
 
@@ -230,4 +314,4 @@ const remove = {
     },
 };
 
-export default [routines, show, create, phrases, retarget, statusCommand('enable', 'ENABLED'), statusCommand('disable', 'DISABLED'), run, remove];
+export default [routines, show, exportRoutine, create, update, phrases, retarget, statusCommand('enable', 'ENABLED'), statusCommand('disable', 'DISABLED'), run, remove];
