@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { NotLoggedIn } from '../src/client.js';
-import { fakeClient } from './fixtures.js';
+import { APPLIANCES, fakeClient } from './fixtures.js';
 import { cli } from './helpers.js';
 
 const written = (client, kind) => client.calls.filter((c) => c[0] === kind);
@@ -53,6 +53,15 @@ describe('acting', () => {
         assert.deepEqual(JSON.parse(JSON.parse(body.triggerJson).payload).utterances, ['lance Kodi', 'ouvre Kodi']);
         assert.equal(JSON.parse(body.sequenceJson).startNode.operationPayload.target, 'tv-ha');
         assert.equal(body.behaviorId, undefined);
+    });
+
+    it('targets a device Amazon lists as an appliance but not yet as a routine entity', async () => {
+        const client = fakeClient({
+            appliances: [...APPLIANCES, { applianceId: 'AAA_SonarCloudService_new', entityId: 'new-entity', friendlyName: 'Aspirateur base' }],
+        });
+        const r = await cli(['create', '--phrase', 'range l\'aspirateur', '--device', 'Aspirateur base', '--apply', '--json'], client);
+        assert.equal(r.code, 0, r.stdout);
+        assert.equal(JSON.parse(written(client, 'create')[0][1].sequenceJson).startNode.operationPayload.target, 'new-entity');
     });
 
     it('refuses to create a phrase another routine answers to', async () => {

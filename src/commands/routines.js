@@ -8,7 +8,7 @@ import { APPLY, UsageError } from '../args.js';
 import { act } from '../context.js';
 import {
     OPERATIONS, checkPhrasesFree, customerIdOf, deviceIds, deviceName, editedPhrases, findByName, findRoutine, idsOfName,
-    phrasesOf, rebuildBody, routineLabel, routineTargets,
+    phrasesOf, rebuildBody, routineLabel, routineTargets, routineTargetsList,
 } from '../model.js';
 import { SpecError, checkSpec, flatSteps, fromSpec, specHasGroups, specPhrases, toSpec, writeSpecBody } from '../routine-spec.js';
 
@@ -97,9 +97,9 @@ export function describeSpec(spec) {
 async function writeSpec(ctx, { spec, existing = null }) {
     checkSpec(spec);
     const client = await ctx.client();
-    const [all, entities, echos] = await Promise.all([client.routines(), client.entities(), client.echos()]);
+    const [all, entities, appliances, echos] = await Promise.all([client.routines(), client.entities(), client.appliances(), client.echos()]);
     checkPhrasesFree(all, specPhrases(spec), existing ? all.find((r) => r.automationId === existing.automationId) : null);
-    const routine = fromSpec(spec, { devices: entities, echos, customerId: customerIdOf(all) });
+    const routine = fromSpec(spec, { devices: routineTargetsList(entities, appliances), echos, customerId: customerIdOf(all) });
     await act(ctx, {
         plan: `${existing ? `update "${routineLabel(existing)}"` : 'create'} ${describeSpec(spec)}`,
         details: { spec, ...(existing ? { automationId: existing.automationId } : {}) },
@@ -223,17 +223,17 @@ const retarget = {
     async run(ctx, { args, opts }) {
         if (!opts.device) throw new Error('retarget needs --device');
         const { client, routine } = await routineAndClient(ctx, args.routine);
-        const entities = await client.entities();
+        const [entities, appliances] = await Promise.all([client.entities(), client.appliances()]);
         let targets = routineTargets(routine);
         if (opts.from) {
-            const from = idsOfName([entities, await client.appliances()], opts.from);
+            const from = idsOfName([entities, appliances], opts.from);
             if (!from.size) throw new Error(`no device is named "${opts.from}"`);
             targets = targets.filter((t) => from.has(t.target));
         }
         if (targets.length !== 1) {
             throw new Error(`retarget needs exactly one matching device action (found ${targets.length}); name the device to replace with --from`);
         }
-        const device = findByName(entities, opts.device);
+        const device = findByName(routineTargetsList(entities, appliances), opts.device);
         const to = deviceIds(device)[0];
         const [old] = targets;
         await act(ctx, {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
     asciiJson, brokenRoutines, flattenEchos, checkPhrasesFree, customerIdOf, editedPhrases, findByName, findRoutine, flattenAppliances,
-    idsOfName, mergeSkills, phrasesOf, rebuildBody, routineTargets, skillIdOf, utteranceTrigger, writeBody,
+    idsOfName, mergeSkills, phrasesOf, rebuildBody, routineTargets, routineTargetsList, skillIdOf, utteranceTrigger, writeBody,
 } from '../src/model.js';
 import { APPLIANCES, CUSTOMER, ENTITIES, bedtime, routines } from './fixtures.js';
 
@@ -137,5 +137,15 @@ describe('writing routines', () => {
 
     it('refuses a routine without trigger', async () => {
         await assert.rejects(rebuildBody({ triggers: [] }, {}, async (t, p) => p), /no trigger/);
+    });
+});
+
+describe('routineTargetsList', () => {
+    it('adds the appliances not yet listed as entities, under their entity id, without doubles', () => {
+        const fresh = { applianceId: 'AAA_new', entityId: 'new-entity', friendlyName: 'Aspirateur base' };
+        const list = routineTargetsList(ENTITIES, [...APPLIANCES, fresh, { applianceId: 'AAA_noentity', friendlyName: 'Sans entité' }]);
+        assert.equal(list.length, ENTITIES.length + 1);
+        assert.deepEqual(list.at(-1), { id: 'new-entity', displayName: 'Aspirateur base' });
+        assert.equal(findByName(list, 'Télé').id, 'tv-ha');
     });
 });

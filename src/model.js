@@ -37,6 +37,19 @@ export function deviceIds(d) {
     return [d.id, d.entityId, d.applianceId, d.endpointId].filter(Boolean);
 }
 
+/**
+ * What a routine can act on: the routine entities, plus the appliances Amazon has not added to that list yet (a
+ * device found a few minutes ago is an appliance long before it is an entity). Routines target a device by its
+ * entity id, so a missing one is added under that id; one already listed is not added twice.
+ */
+export function routineTargetsList(entities, appliances = []) {
+    const known = new Set(entities.flatMap(deviceIds));
+    const missing = appliances
+        .filter((a) => a.entityId && !known.has(a.entityId))
+        .map((a) => ({ id: a.entityId, displayName: deviceName(a) }));
+    return [...entities, ...missing];
+}
+
 export function findByName(list, key, what = 'device') {
     const k = key.toLowerCase();
     const hits = list.filter((d) => deviceName(d).toLowerCase() === k || deviceIds(d).includes(key));
