@@ -27,7 +27,7 @@ const SECURITY_HEADERS = {
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
-    // Ionic injects its component styles at run time, hence 'unsafe-inline' for styles; scripts stay 'self' only.
+    // Menus and popovers are positioned with inline styles, hence 'unsafe-inline' for styles; scripts stay 'self' only.
     'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'",
 };
 

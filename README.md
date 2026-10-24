@@ -181,7 +181,8 @@ npm run ui:build   # once, and after an update (install.sh does it)
 npm run ui         # → http://127.0.0.1:3457/
 ```
 
-A React + [Ionic](https://ionicframework.com/) app over the CLI, built for a phone first and fine on a computer.
+A [Svelte 5](https://svelte.dev/) app over the CLI, with [shadcn-svelte](https://www.shadcn-svelte.com/) components
+and Tailwind, built for a phone first and fine on a computer (dark when the system is).
 
 - **Routines**: search, sort, filters (folded behind a button on a phone), an on/off switch per routine, phrases
   added or removed in place, run, delete — and a **routine editor**: name, phrases or a schedule with its days, then
@@ -287,8 +288,8 @@ src/
 interface/
   server/                 app (routes, protections), writes (whitelist), cli-runner (subprocess / in-process),
                           journal, index
-  app/                    the React + Ionic app (Vite): src/lib (pure, tested: store, activity, actions, listing,
-                          model, prefs, api, explain), src/state, src/components, src/views
+  app/                    the Svelte + shadcn-svelte app (Vite): src/lib/core (pure, tested: store, activity,
+                          actions, listing, model, prefs, api, explain), src/lib/state, components, views
   test/
 mobile/                   the Android app: Capacitor project (android/), src/main.cjs (Node entry), src/loader.html
 scripts/build-apk.sh      builds the APK into dist/

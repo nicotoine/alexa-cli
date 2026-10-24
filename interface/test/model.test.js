@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { actionsOf, editedPhrases, idsOfName, phraseOwner, phrasesOf, targetName } from '../app/src/lib/model.js';
-import { explain } from '../app/src/lib/explain.js';
+import { actionsOf, editedPhrases, idsOfName, phraseOwner, phrasesOf, targetName } from '../app/src/lib/core/model.js';
+import { explain } from '../app/src/lib/core/explain.js';
 
 const routine = {
     automationId: 'r', name: 'on va dormir',

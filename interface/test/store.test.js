@@ -3,10 +3,10 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createActions } from '../app/src/lib/actions.js';
-import { createActivity } from '../app/src/lib/activity.js';
-import { explain } from '../app/src/lib/explain.js';
-import { createStore } from '../app/src/lib/store.js';
+import { createActions } from '../app/src/lib/core/actions.js';
+import { createActivity } from '../app/src/lib/core/activity.js';
+import { explain } from '../app/src/lib/core/explain.js';
+import { createStore } from '../app/src/lib/core/store.js';
 
 const routine = (id, status = 'ENABLED', phrases = [id]) => ({
     automationId: id, name: id, status,

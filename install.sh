@@ -10,7 +10,7 @@
 #   ./install.sh --bin-dir ~/bin     # link somewhere else
 #   ./install.sh --shell zsh         # completion for another shell
 #   ./install.sh --no-completion     # skip the completion step
-#   ./install.sh --no-ui             # skip building the web interface (React + Ionic, ~140 MB of build tools)
+#   ./install.sh --no-ui             # skip building the web interface (Svelte + shadcn-svelte, ~140 MB of build tools)
 #   ./install.sh --uninstall         # remove the link and the completion (the Amazon session is kept)
 #
 # Nothing here signs you in: run `alexa-cli login` afterwards.
