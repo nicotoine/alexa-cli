@@ -77,3 +77,7 @@ ion-modal.editor { --width: min(780px, 100%); --height: min(92vh, 960px); --bord
 .editor-section { margin: 16px 0 6px; padding: 0 16px; font-weight: 600; font-size: 13px; letter-spacing: .02em; text-transform: uppercase; color: var(--ion-color-medium); }
 .days { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
 .spec-error { color: var(--ion-color-danger); padding: 0 16px; font-size: 14px; }
+
+/* The build, next to the title on a wide screen only: a phone has no room, the activity sheet shows it there. */
+.title-version { margin-left: 10px; font-size: 12px; font-weight: 400; color: var(--ion-color-medium); }
+@media (max-width: 767px) { .title-version { display: none; } }

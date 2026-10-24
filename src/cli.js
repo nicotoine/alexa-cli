@@ -1,19 +1,15 @@
 // The front end: global options, help, dispatch to a command and error rendering. The commands live in
 // commands/, one module per feature; output in ui, the Alexa client in client, the logic in model.
 
-import fs from 'node:fs';
 import { COMMANDS } from './commands/index.js';
 import { UsageError, commandHelp, mainHelp, parse } from './args.js';
 import { createContext } from './context.js';
 import { createOutput } from './ui.js';
+import { versionInfo } from './version.js';
 
 export const PROG = 'alexa-cli';
 
 const INTRO = 'alexa-cli — Alexa smart-home devices and voice routines from the terminal (unofficial Alexa app API).';
-
-function version() {
-    return JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
-}
 
 /** Runs one invocation and returns its exit code: 0 done, 1 failed, 2 wrong usage. */
 export async function main(argv, { stdout = process.stdout, stderr = process.stderr, connectFn } = {}) {
@@ -23,7 +19,7 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
         return name ? 0 : 2;
     }
     if (name === '--version') {
-        stdout.write(`${version()}\n`);
+        stdout.write(`${versionInfo().label}\n`);
         return 0;
     }
     const command = COMMANDS.find((c) => c.name === name);

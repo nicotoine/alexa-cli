@@ -1,10 +1,16 @@
-# Tests on every push and pull request; the Android app on every tag (v*) and on demand.
+# Tests on every push and pull request; the Android app on every push to main and on every version tag.
 #
-# The APK is signed with the release key when the repository has these secrets (Settings > Secrets > Actions):
-#   ALEXA_CLI_KEYSTORE_BASE64   the keystore file, base64-encoded (base64 -w0 alexa-cli.jks)
+# Versions
+#   - The version is package.json's ("npm version minor" to move it). The build number is the number of commits on
+#     main: it only grows, so each APK installs over the previous one (when signed with the same key).
+#   - Every push to main updates the "latest" pre-release: one fixed download link to the newest APK
+#     (alexa-cli-latest-arm64.apk), and the versioned APK as a run artifact.
+#   - A tag vX.Y.Z makes a stable release; it must match package.json, or the job fails.
+#
+# Signing: with these repository secrets (Settings > Secrets > Actions) the APK is a signed release; without them, a
+# debug APK signed with a throwaway key, which cannot be installed over the previous one (uninstall first).
+#   ALEXA_CLI_KEYSTORE_BASE64   the keystore, base64-encoded (base64 -w0 alexa-cli.jks)
 #   ALEXA_CLI_KEYSTORE_PASSWORD, ALEXA_CLI_KEY_ALIAS, ALEXA_CLI_KEY_PASSWORD
-# Without them it builds a debug APK: it installs, but each build is signed with a throwaway key, so a new one cannot
-# be installed over the previous one (uninstall first).
 
 name: ci
 
@@ -34,12 +40,18 @@ jobs:
 
   apk:
     needs: test
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # One APK build per ref at a time: two pushes in a row must not race on the "latest" release.
+    concurrency:
+      group: apk-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the build number is the commit count
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -47,6 +59,23 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      - name: Version
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          build=$(git rev-list --count HEAD)
+          commit=$(git rev-parse --short HEAD)
+          if [[ "$GITHUB_REF" == refs/tags/v* && "${GITHUB_REF#refs/tags/v}" != "$version" ]]; then
+            echo "::error::tag ${GITHUB_REF#refs/tags/} does not match package.json ($version): bump it with npm version first"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "name=$version-$build" >> "$GITHUB_OUTPUT"
+          echo "### alexa-cli $version-$build ($commit)" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Release key (when configured)
         id: key
         env:
@@ -55,9 +84,14 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/alexa-cli.jks"
             echo "path=$RUNNER_TEMP/alexa-cli.jks" >> "$GITHUB_OUTPUT"
+          else
+            echo "No signing key in the secrets: debug APK." >> "$GITHUB_STEP_SUMMARY"
           fi
+
       - name: Build the APK (arm64, the architecture of current phones)
         env:
+          ALEXA_CLI_BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          ALEXA_CLI_COMMIT: ${{ steps.version.outputs.commit }}
           ALEXA_CLI_KEYSTORE: ${{ steps.key.outputs.path }}
           ALEXA_CLI_KEYSTORE_PASSWORD: ${{ secrets.ALEXA_CLI_KEYSTORE_PASSWORD }}
           ALEXA_CLI_KEY_ALIAS: ${{ secrets.ALEXA_CLI_KEY_ALIAS }}
@@ -68,13 +102,41 @@ jobs:
           else
             scripts/build-apk.sh --abi arm64-v8a
           fi
+          mkdir -p latest
+          cp dist/alexa-cli-*.apk latest/alexa-cli-latest-arm64.apk
+          ls -la dist latest
+
       - uses: actions/upload-artifact@v4
         with:
-          name: alexa-cli-apk
+          name: alexa-cli-${{ steps.version.outputs.name }}
           path: dist/*.apk
           if-no-files-found: error
-      - name: Attach to the GitHub release
+
+      - name: Move the "latest" tag to this commit
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git tag -f latest
+          git push -f origin latest
+
+      - name: Update the "latest" pre-release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Dernière version (main) — ${{ steps.version.outputs.name }}
+          prerelease: true
+          make_latest: false
+          body: |
+            Construite automatiquement à chaque push sur `main`.
+            **${{ steps.version.outputs.name }}** — commit ${{ steps.version.outputs.commit }}.
+
+            Télécharger : `alexa-cli-latest-arm64.apk` (téléphones récents, arm64).
+          files: latest/alexa-cli-latest-arm64.apk
+
+      - name: Stable release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: alexa-cli ${{ steps.version.outputs.version }}
+          make_latest: true
           files: dist/*.apk

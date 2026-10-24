@@ -8,6 +8,10 @@
 #        ALEXA_CLI_KEYSTORE (path), ALEXA_CLI_KEYSTORE_PASSWORD, ALEXA_CLI_KEY_ALIAS, ALEXA_CLI_KEY_PASSWORD
 #   scripts/build-apk.sh --abi arm64-v8a # one architecture only (a smaller APK for a recent phone)
 #
+# Versions: the version is package.json's; the build number is the number of commits on the branch (it only grows
+# on main, so every APK installs over the previous one) — override with ALEXA_CLI_BUILD_NUMBER. The APK is named
+# alexa-cli-<version>-<build>[-<abi>][-debug].apk and the app shows "<version>-<build> (<commit>)".
+#
 # Needs Node 22+, a JDK 21 and the Android SDK (ANDROID_HOME, or ~/Android/Sdk). The APK lands in dist/.
 set -euo pipefail
 
@@ -34,6 +38,12 @@ if [ -z "${JAVA_HOME:-}" ]; then
 fi
 say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 
+VERSION="$(node -p "require('$REPO/package.json').version")"
+BUILD="${ALEXA_CLI_BUILD_NUMBER:-$(git -C "$REPO" rev-list --count HEAD)}"
+COMMIT="${ALEXA_CLI_COMMIT:-$(git -C "$REPO" rev-parse --short HEAD)}"
+VERSION_NAME="$VERSION-$BUILD"
+say "alexa-cli $VERSION_NAME ($COMMIT)"
+
 say "web interface"
 npm --prefix "$REPO" run --silent ui:build
 
@@ -50,6 +60,8 @@ mkdir -p "$NODE_PROJECT/app/interface"
 cp -r "$REPO/interface/server" "$NODE_PROJECT/app/interface/server"
 cp -r "$REPO/interface/app/dist" "$NODE_PROJECT/app/interface/app/dist"
 cp "$REPO/package.json" "$REPO/package-lock.json" "$NODE_PROJECT/app/"
+# What src/version.js reads: the CLI's --version, the page and the journal say which build is running.
+printf '{\n  "build": %s,\n  "commit": "%s",\n  "builtAt": "%s"\n}\n' "$BUILD" "$COMMIT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$NODE_PROJECT/app/build.json"
 npm --prefix "$NODE_PROJECT/app" ci --omit=dev --no-audit --no-fund --ignore-scripts
 du -sh "$NODE_PROJECT" | sed 's/^/size: /'
 
@@ -61,7 +73,7 @@ npx cap sync android
 
 say "Gradle ($TYPE${ABI:+, $ABI})"
 cd "$MOBILE/android"
-GRADLE_ARGS=()
+GRADLE_ARGS=("-PalexaBuild=$BUILD" "-PalexaVersionName=$VERSION_NAME ($COMMIT)")
 if [ -n "$ABI" ]; then GRADLE_ARGS+=("-PalexaAbi=$ABI"); fi
 if [ "$TYPE" = release ]; then
     : "${ALEXA_CLI_KEYSTORE:?set ALEXA_CLI_KEYSTORE (and the passwords) for a release build}"
@@ -72,9 +84,10 @@ else
     APK="app/build/outputs/apk/debug/app-debug.apk"
 fi
 
-VERSION="$(node -p "require('$REPO/package.json').version")"
 mkdir -p "$REPO/dist"
-OUT="$REPO/dist/alexa-cli-$VERSION-$TYPE${ABI:+-$ABI}.apk"
+SUFFIX=""
+if [ "$TYPE" = debug ]; then SUFFIX="-debug"; fi
+OUT="$REPO/dist/alexa-cli-$VERSION_NAME${ABI:+-$ABI}$SUFFIX.apk"
 cp "$APK" "$OUT"
 say "done"
 ls -la "$OUT"

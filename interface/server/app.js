@@ -5,11 +5,13 @@
 //   POST /api/do/<command> one change, dry run unless {"apply": true}; answers the CLI's --json document
 //   GET  /api/session      whether a session is stored and accepted
 //   GET  /api/journal      the latest changes the interface applied, newest first
+//   GET  /api/version      which build this is (version, build number, commit)
 //   POST /api/login        starts the Amazon login; answers the local page to sign in on
 //   GET  /…                the page (interface/public)
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { versionInfo } from '../../src/version.js';
 import * as journal from './journal.js';
 import { BadRequest, writeArgv } from './writes.js';
 
@@ -128,6 +130,7 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {} }
         try {
             if (req.method === 'GET' && pathname === '/api/snapshot') return snapshot(req, res);
             if (req.method === 'GET' && pathname === '/api/session') return send(res, 200, await runner.session());
+            if (req.method === 'GET' && pathname === '/api/version') return send(res, 200, versionInfo());
             if (req.method === 'GET' && pathname === '/api/journal') return send(res, 200, journal.read({ ...journalOptions, limit: 100 }));
             if (req.method === 'POST' && pathname === '/api/login') return await login(req, res);
             if (req.method === 'POST' && pathname.startsWith('/api/do/')) return await change(req, res, pathname.slice('/api/do/'.length));

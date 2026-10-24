@@ -39,7 +39,7 @@ export default function App() {
             <IonPage>
                 <IonHeader>
                     <IonToolbar>
-                        <IonTitle>Alexa</IonTitle>
+                        <IonTitle>Alexa{app.build && <span className="title-version">{app.build.label}</span>}</IonTitle>
                         <IonButtons slot="end">
                             <SyncChip sync={app.sync} />
                             <IonButton onClick={app.reload} aria-label="Recharger depuis Alexa" title="Recharger depuis Alexa">
@@ -76,7 +76,7 @@ export default function App() {
                         </IonFab>
                     )}
                 </IonContent>
-                <ActivityToast activity={app.activity} />
+                <ActivityToast activity={app.activity} build={app.build} />
                 <RoutineEditor
                     open={editing !== null}
                     routine={editing && editing.routine}

@@ -97,6 +97,12 @@ describe('protections', () => {
 });
 
 describe('session and login', () => {
+    it('says which build runs', async () => {
+        const info = JSON.parse((await request('/api/version')).body);
+        assert.match(info.version, /^\d+\.\d+\.\d+/);
+        assert.ok('build' in info && 'label' in info);
+    });
+
     it('says whether a session is accepted', async () => {
         assert.deepEqual(JSON.parse((await request('/api/session')).body), { stored: true, valid: false, loggingIn: false });
     });

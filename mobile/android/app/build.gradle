@@ -1,8 +1,11 @@
 apply plugin: 'com.android.application'
 
-// The app's version is alexa-cli's (package.json at the repo root); versionCode grows with it.
+// The app's version is alexa-cli's (package.json at the repo root). scripts/build-apk.sh passes the build number
+// (commits on the branch: it only grows, so each APK installs over the previous one) and the full version name.
 def cliVersion = new groovy.json.JsonSlurper().parse(file('../../../package.json')).version
 def (major, minor, patch) = cliVersion.tokenize('.').collect { it.replaceAll('[^0-9].*', '') as int }
+def buildNumber = project.hasProperty('alexaBuild') ? (project.property('alexaBuild') as int) : major * 10000 + minor * 100 + patch
+def fullVersionName = project.hasProperty('alexaVersionName') ? project.property('alexaVersionName') : cliVersion
 
 android {
     namespace = "io.github.nicotoine.alexacli"
@@ -11,8 +14,8 @@ android {
         applicationId "io.github.nicotoine.alexacli"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode major * 10000 + minor * 100 + patch
-        versionName cliVersion
+        versionCode buildNumber
+        versionName fullVersionName
         // scripts/build-apk.sh --abi arm64-v8a: one architecture only. Embedded Node.js is ~40 MB per architecture.
         if (project.hasProperty('alexaAbi')) {
             ndk { abiFilters project.property('alexaAbi') }

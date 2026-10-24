@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createActions } from '../lib/actions.js';
 import { createActivity } from '../lib/activity.js';
-import { change, login, session, snapshot } from '../lib/api.js';
+import { change, login, session, snapshot, version } from '../lib/api.js';
 import { explain } from '../lib/explain.js';
 import { loadPrefs, savePrefs } from '../lib/prefs.js';
 import { createStore } from '../lib/store.js';
@@ -33,6 +33,8 @@ export function useApp() {
     const [sync, setSync] = useState({ state: 'loading', text: 'Chargement…' });
     const [needsLogin, setNeedsLogin] = useState(false);
     const [prefs, setPrefsState] = useState(loadPrefs);
+    const [build, setBuild] = useState(null);
+    useEffect(() => { version().then(setBuild, () => setBuild(null)); }, []);
 
     const core = useMemo(() => {
         const store = createStore({ kinds: KINDS, onChange: bump });
@@ -162,5 +164,6 @@ export function useApp() {
         startLogin,
         prefs,
         setPrefs,
+        build,
     };
 }

@@ -19,6 +19,13 @@ export async function* snapshot(fetchFn = fetch) {
     }
 }
 
+/** Which build the server runs: { version, build, commit, label }. */
+export async function version(fetchFn = fetch) {
+    const res = await fetchFn('/api/version');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
 /** The latest changes the interface applied (server journal), newest first. */
 export async function journal(fetchFn = fetch) {
     const res = await fetchFn('/api/journal');

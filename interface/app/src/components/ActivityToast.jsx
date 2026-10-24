@@ -73,7 +73,7 @@ function JournalList() {
     );
 }
 
-export default function ActivityToast({ activity }) {
+export default function ActivityToast({ activity, build }) {
     const [open, setOpen] = useState(false);
     const [pane, setPane] = useState('queue');
     const items = activity.items;
@@ -129,6 +129,7 @@ export default function ActivityToast({ activity }) {
                         : <JournalList />}
                     <IonNote className="ion-padding" style={{ display: 'block' }}>
                         Les suppressions attendent 5 s avant d'être envoyées : « Annuler » les arrête.
+                        {build && <><br />alexa-cli {build.label}</>}
                     </IonNote>
                 </IonContent>
             </IonModal>
