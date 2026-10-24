@@ -250,9 +250,23 @@ tr.pending td { opacity: .5; }
 }
 
 @media (max-width: 640px) {
-  .top { flex-wrap: wrap; }
+  /* Header: brand, sync state and refresh on one line, the tabs on the next. */
+  .top { flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px 0; }
+  .brand { flex: 1; }
+  .sync { order: 2; max-width: 34vw; overflow: hidden; text-overflow: ellipsis; }
+  #refresh { order: 3; padding: 6px 10px; }
+  .tabs { order: 4; flex-basis: 100%; margin: 0 -8px; }
+  .tabs button { flex: 1; }
+  /* The filter gets the whole width; creating sits under it. */
+  .toolbar { flex-wrap: wrap; }
+  .toolbar input { flex-basis: 100%; }
+  .toolbar .primary { flex: 1; }
+  main { padding-top: 14px; }
   #toasts { right: 16px; left: 16px; width: auto; }
-  .tabs { order: 3; flex-basis: 100%; }
   .row { grid-template-columns: 1fr; }
-  .add-phrase input { width: 160px; }
+  .add-phrase { flex: 1 1 100%; }
+  .add-phrase input { width: auto; flex: 1; }
+  /* Comfortable touch targets. */
+  .card-actions button { min-height: 36px; }
+  .chip button { padding: 4px 8px; }
 }
