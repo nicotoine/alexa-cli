@@ -22,7 +22,7 @@
     onMount(() => app.start());
 
     const sync = $derived(app.sync);
-    const busy = $derived(sync.state === 'loading' || sync.state === 'saving');
+    const busy = $derived(sync.state === 'loading' || sync.state === 'saving' || app.refreshing);
 </script>
 
 <div class="min-h-dvh pb-28">

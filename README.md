@@ -196,6 +196,9 @@ and Tailwind, built for a phone first and fine on a computer (dark when the syst
   `~/.config/alexa-cli/journal.jsonl`.
 - **Streamed and cached.** One connection sends each list as soon as it is ready, routines first; the server keeps the
   last one, so the page draws at once and refreshes behind.
+- **Kept fresh.** Every two minutes while the page is visible, and at once when it comes back (another tab, the
+  phone unlocked, back online) if what it shows is older than 30 s, the page reads Amazon again quietly — a small
+  loader in the badge, nothing else moves. Never while a change is being sent; changes in flight stay drawn on top.
 - **Signing in from the page** when no session is accepted (there is no terminal on a phone).
 - **Local only.** The server listens on `127.0.0.1`, refuses any other host name, runs only a whitelist of CLI
   commands with arguments passed without a shell, and requires a header a page from another site cannot send.
