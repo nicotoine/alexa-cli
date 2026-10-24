@@ -1,7 +1,9 @@
 // The Routines tab: one card per routine, phrases as chips, its actions, and what can be done to it.
+// Which routines and in what order comes from listing.routineRows.
 
 import { el } from '../dom.js';
-import { OPS, actionsOf, deviceNames, isVoice, label, phraseOwner, phrasesOf, targetName } from '../model.js';
+import { routineRows } from '../listing.js';
+import { OPS, deviceNames, isVoice, label, phraseOwner, targetName } from '../model.js';
 
 function describe(action, names) {
     if (action.speak) return el('span', {}, 'dire « ', el('b', {}, action.speak), ' »');
@@ -10,16 +12,19 @@ function describe(action, names) {
     return el('span', {}, `${verb} `, el('b', {}, targetName(action.target, names) || `${action.target.slice(0, 12)}… (introuvable)`));
 }
 
-export function renderRoutines(box, { view, store, actions, filter, toast, onRetarget, onRun }) {
-    if (!view.routines) return box.replaceChildren(el('div', { class: 'loading' }, 'Chargement des routines…'));
+/** Draws the routines; returns how many are shown (null while loading). */
+export function renderRoutines(box, { view, store, actions, criteria, toast, onRetarget, onRun }) {
+    if (!view.routines) {
+        box.replaceChildren(el('div', { class: 'loading' }, 'Chargement des routines…'));
+        return null;
+    }
     const names = deviceNames(view);
-    const q = filter.trim().toLowerCase();
-    const rows = view.routines
-        .map((r) => ({ r, phrases: phrasesOf(r), acts: actionsOf(r) }))
-        .filter(({ r, phrases, acts }) => !q || [label(r), ...phrases, ...acts.map((a) => (a.target && targetName(a.target, names)) || '')]
-            .some((s) => s.toLowerCase().includes(q)))
-        .sort((a, b) => label(a.r).localeCompare(label(b.r), 'fr'));
-    if (!rows.length) return box.replaceChildren(el('div', { class: 'empty' }, q ? 'Aucune routine ne correspond.' : 'Aucune routine.'));
+    const rows = routineRows(view, criteria);
+    if (!rows.length) {
+        const filtered = view.routines.length > 0;
+        box.replaceChildren(el('div', { class: 'empty' }, filtered ? 'Aucune routine ne correspond aux filtres.' : 'Aucune routine.'));
+        return 0;
+    }
 
     box.replaceChildren(...rows.map(({ r, phrases, acts }) => {
         const id = r.automationId;
@@ -52,4 +57,5 @@ export function renderRoutines(box, { view, store, actions, filter, toast, onRet
                 acts.some((a) => a.target) && el('button', { class: 'link', onclick: () => onRetarget(r, acts, names) }, 'Changer d\'appareil'),
                 el('button', { class: 'link danger-text', onclick: () => actions.deleteRoutine(r) }, 'Supprimer')));
     }));
+    return rows.length;
 }

@@ -134,8 +134,12 @@ alexa-cli delete "test" --apply --json | jq .applied
 npm run ui        # → http://127.0.0.1:3457/
 ```
 
-A page over the CLI: routines (filter, add and remove phrases, enable, run, change device, delete, create), devices
-with the routines that use them, skills, and the audit.
+A page over the CLI: routines (add and remove phrases, enable, run, change device, delete, create), devices with
+the routines that use them, skills, and the audit. Works on a phone.
+
+- **Sort and filter.** Routines sort by name, status, number of phrases or device, and filter on status, trigger,
+  device and broken references; devices sort on any column header (click again to reverse) and filter on source,
+  maker and whether a routine uses them; skills sort and filter by type. Choices are remembered in the browser.
 
 - **Streamed and cached.** One `snapshot` connection sends each list as soon as it is ready, routines first (about
   two seconds); the server keeps the last one, so the page draws at once on the next visit and refreshes behind.
@@ -193,7 +197,7 @@ src/
   ui.js                   human, --plain and --json output
 interface/
   server/                 app (routes, protections), writes (whitelist), cli-runner (queue, stream), index
-  public/js/              store (optimistic engine), actions, api, model, toasts, views/ — ES modules, no build
+  public/js/              store (optimistic engine), listing (sort, filter), prefs, actions, api, model, toasts, views/ — ES modules, no build
   test/
 test/                     node:test suites; command_surface.json pins every command and option
 ```

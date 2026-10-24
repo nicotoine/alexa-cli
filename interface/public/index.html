@@ -26,8 +26,29 @@
   <main>
     <section id="tab-routines" class="tab" role="tabpanel">
       <div class="toolbar">
-        <input type="search" id="routine-filter" placeholder="Filtrer par nom, phrase ou appareil…" aria-label="Filtrer les routines">
+        <input type="search" id="routine-filter" data-pref="routines.text" placeholder="Filtrer par nom, phrase ou appareil…" aria-label="Filtrer les routines">
         <button class="primary" id="new-routine">Nouvelle routine</button>
+      </div>
+      <div class="filters" role="group" aria-label="Trier et filtrer les routines">
+        <label>Trier <select data-pref="routines.sort" id="routine-sort"></select></label>
+        <label>Statut
+          <select data-pref="routines.status">
+            <option value="all">Toutes</option>
+            <option value="ENABLED">Actives</option>
+            <option value="DISABLED">Désactivées</option>
+          </select>
+        </label>
+        <label>Déclencheur
+          <select data-pref="routines.trigger">
+            <option value="all">Tous</option>
+            <option value="voice">Phrase</option>
+            <option value="other">Autre</option>
+          </select>
+        </label>
+        <label>Appareil <select data-pref="routines.device" id="routine-device"></select></label>
+        <label class="check"><input type="checkbox" data-pref="routines.broken"> Cassées seulement</label>
+        <span class="count" id="routine-count" aria-live="polite"></span>
+        <button type="button" class="link" data-reset="routines">Réinitialiser</button>
       </div>
       <form id="create-form" class="panel" hidden>
         <h2>Nouvelle routine vocale</h2>
@@ -55,7 +76,20 @@
 
     <section id="tab-devices" class="tab" role="tabpanel" hidden>
       <div class="toolbar">
-        <input type="search" id="device-filter" placeholder="Filtrer les appareils…" aria-label="Filtrer les appareils">
+        <input type="search" id="device-filter" data-pref="devices.text" placeholder="Filtrer les appareils…" aria-label="Filtrer les appareils">
+      </div>
+      <div class="filters" role="group" aria-label="Filtrer les appareils">
+        <label>Source <select data-pref="devices.source" id="device-source"></select></label>
+        <label>Fabricant <select data-pref="devices.maker" id="device-maker"></select></label>
+        <label>Utilisé par une routine
+          <select data-pref="devices.used">
+            <option value="all">Peu importe</option>
+            <option value="yes">Oui</option>
+            <option value="no">Non</option>
+          </select>
+        </label>
+        <span class="count" id="device-count" aria-live="polite"></span>
+        <button type="button" class="link" data-reset="devices">Réinitialiser</button>
       </div>
       <div class="table-wrap"><table id="devices"></table></div>
     </section>
@@ -63,6 +97,13 @@
     <section id="tab-skills" class="tab" role="tabpanel" hidden>
       <p class="lead">Skills activées et appareils de maison connectée fournis par chacune. Un appareil qui
         réapparaît ici après suppression vient d'une skill toujours liée.</p>
+      <div class="filters" role="group" aria-label="Trier et filtrer les skills">
+        <label>Trier <select data-pref="skills.sort" id="skill-sort"></select></label>
+        <label>Type <select data-pref="skills.type" id="skill-type"></select></label>
+        <label class="check"><input type="checkbox" data-pref="skills.withDevices"> Avec appareils seulement</label>
+        <span class="count" id="skill-count" aria-live="polite"></span>
+        <button type="button" class="link" data-reset="skills">Réinitialiser</button>
+      </div>
       <div id="skills" class="cards"></div>
     </section>
 

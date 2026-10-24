@@ -84,6 +84,46 @@ main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 64px; }
 .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
 .toolbar input { flex: 1; }
 
+/* Sort and filter bar, under the toolbar */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin: -4px 0 16px;
+}
+.filters label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.filters select { width: auto; min-width: 9em; padding: 6px 8px; font-size: 14px; color: var(--text); }
+.filters .check { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; color: var(--text); padding-bottom: 7px; }
+.filters .check input { width: auto; }
+.filters .count { margin-left: auto; color: var(--muted); font-size: 13px; padding-bottom: 8px; }
+.filters .link { padding-bottom: 8px; }
+
+/* Sortable column headers */
+th button.sort {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+th button.sort .arrow { color: var(--muted); font-size: 12px; }
+th button.sort.active .arrow { color: var(--accent); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 input, select, textarea {
   width: 100%;
   font: inherit;
@@ -268,5 +308,8 @@ tr.pending td { opacity: .5; }
   .add-phrase input { width: auto; flex: 1; }
   /* Comfortable touch targets. */
   .card-actions button { min-height: 36px; }
+  .filters label { flex: 1 1 40%; }
+  .filters select { width: 100%; }
+  .filters .count { margin-left: 0; }
   .chip button { padding: 4px 8px; }
 }

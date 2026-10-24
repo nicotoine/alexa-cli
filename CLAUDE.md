@@ -17,7 +17,7 @@ src/client.js          the Alexa API. The only module that imports alexa-remote2
 src/context.js         the client, connected on first use; act() — the --apply guard
 src/ui.js              human / --plain / --json
 interface/server/      app.js (routes, protections), writes.js (whitelist), cli-runner.js (queue, stream)
-interface/public/js/   store.js (optimistic engine, no DOM), actions.js, api.js, model.js, toasts.js, views/
+interface/public/js/   store.js (optimistic engine, no DOM), listing.js (sort, filter — pure), prefs.js, actions.js, api.js, model.js, toasts.js, views/
 ```
 
 **Commands are declared, not attached.** A command module exports `{ name, group, summary, args, options, modes,

@@ -3,7 +3,9 @@
 import { createActions } from './actions.js';
 import { change, snapshot } from './api.js';
 import { $, el } from './dom.js';
+import { ROUTINE_SORTS, SKILL_SORTS, deviceFacets, nextDeviceSort, routineDevices, skillTypes } from './listing.js';
 import { label, phraseOwner } from './model.js';
+import { DEFAULTS, controlValue, loadPrefs, savePrefs } from './prefs.js';
 import { createStore } from './store.js';
 import { explain, toast } from './toasts.js';
 import { renderAudit } from './views/audit.js';
@@ -13,6 +15,7 @@ import { renderSkills } from './views/skills.js';
 
 const KINDS = ['routines', 'devices', 'appliances', 'skills', 'audit'];
 let lastSync = '';
+let prefs = loadPrefs();
 
 const store = createStore({ kinds: KINDS, onChange: render });
 const actions = createActions({ store, change, toast, explain, resync: scheduleResync });
@@ -21,16 +24,64 @@ const actions = createActions({ store, change, toast, explain, resync: scheduleR
 
 function render(changed = KINDS) {
     const k = new Set(changed);
-    const all = changed.length === 0 || k.has('routines') || k.has('devices') || k.has('appliances');
+    // The audit feeds the "cassées" filter and names the devices, so it redraws the routines too.
+    const lists = changed.length === 0 || ['routines', 'devices', 'appliances', 'audit'].some((x) => k.has(x));
     const ctx = { view: store.view, store, actions, toast };
-    if (all) {
-        renderRoutines($('#routines'), { ...ctx, filter: $('#routine-filter').value, onRetarget: retargetDialog, onRun: confirmRun });
-        renderDevices($('#devices'), { ...ctx, filter: $('#device-filter').value });
+    if (lists) {
+        fillFacets();
+        count('#routine-count', renderRoutines($('#routines'), { ...ctx, criteria: prefs.routines, onRetarget: retargetDialog, onRun: confirmRun }), store.view.routines, 'routine');
+        count('#device-count', renderDevices($('#devices'), { ...ctx, criteria: prefs.devices, onSort: sortDevices }), store.view.appliances, 'appareil');
         fillDeviceSelect($('#create-device'));
     }
-    if (k.has('skills')) renderSkills($('#skills'), ctx);
+    if (k.has('skills') || changed.length === 0) {
+        fillFacets();
+        count('#skill-count', renderSkills($('#skills'), { ...ctx, criteria: prefs.skills }), store.view.skills, 'skill');
+    }
     if (k.has('audit')) renderAudit($('#audit'), ctx);
     showSync();
+}
+
+function count(selector, shown, all, noun) {
+    const total = (all || []).length;
+    $(selector).textContent = shown === null ? '' : shown === total ? `${total} ${noun}${total > 1 ? 's' : ''}` : `${shown} sur ${total}`;
+}
+
+// ---- sort and filter controls ---------------------------------------------------------------------------------
+
+function options(select, entries, value) {
+    select.replaceChildren(...entries.map(([v, text]) => el('option', { value: v, selected: v === value }, text)));
+}
+
+// Options that depend on the data (devices, makers, types) are rebuilt when it changes; the choice is kept.
+function fillFacets() {
+    const view = store.view;
+    options($('#routine-sort'), Object.entries(ROUTINE_SORTS), prefs.routines.sort);
+    options($('#routine-device'), [['', 'Tous'], ...routineDevices(view).map((d) => [d, d])], prefs.routines.device);
+    const { sources, makers } = deviceFacets(view);
+    options($('#device-source'), [['all', 'Toutes'], ...sources.map((s) => [s, s])], prefs.devices.source);
+    options($('#device-maker'), [['', 'Tous'], ...makers.map((m) => [m, m])], prefs.devices.maker);
+    options($('#skill-sort'), Object.entries(SKILL_SORTS), prefs.skills.sort);
+    options($('#skill-type'), [['all', 'Tous'], ...skillTypes(view).map((t) => [t, t])], prefs.skills.type);
+}
+
+// Sets every [data-pref] control from the saved choices (texts and checkboxes; selects are set by fillFacets).
+function showPrefs() {
+    for (const control of document.querySelectorAll('[data-pref]')) {
+        const [tab, key] = control.dataset.pref.split('.');
+        if (control.type === 'checkbox') control.checked = Boolean(prefs[tab][key]);
+        else if (control.tagName === 'INPUT') control.value = prefs[tab][key];
+        else if ([...control.options].some((o) => o.value === prefs[tab][key])) control.value = prefs[tab][key];
+    }
+}
+
+function setPrefs(tab, next) {
+    prefs = { ...prefs, [tab]: next };
+    savePrefs(prefs);
+    render(tab === 'skills' ? ['skills'] : ['routines']);
+}
+
+function sortDevices(column) {
+    setPrefs('devices', nextDeviceSort(prefs.devices, column));
 }
 
 function showSync(state, text) {
@@ -129,8 +180,20 @@ document.querySelectorAll('.tabs button').forEach((btn) => btn.addEventListener(
     document.querySelectorAll('.tab').forEach((t) => { t.hidden = t.id !== `tab-${btn.dataset.tab}`; });
 }));
 
-$('#routine-filter').addEventListener('input', () => render(['routines']));
-$('#device-filter').addEventListener('input', () => render(['appliances']));
+for (const control of document.querySelectorAll('[data-pref]')) {
+    const [tab, key] = control.dataset.pref.split('.');
+    control.addEventListener(control.type === 'search' ? 'input' : 'change', () => {
+        setPrefs(tab, { ...prefs[tab], [key]: controlValue(control, DEFAULTS[tab], key) });
+    });
+}
+for (const button of document.querySelectorAll('[data-reset]')) {
+    button.addEventListener('click', () => {
+        const tab = button.dataset.reset;
+        // The text filter is kept: resetting is about the sort and the menus.
+        setPrefs(tab, { ...DEFAULTS[tab], ...(prefs[tab].text !== undefined ? { text: prefs[tab].text } : {}) });
+        showPrefs();
+    });
+}
 $('#refresh').addEventListener('click', () => load());
 
 $('#new-routine').addEventListener('click', () => { $('#create-form').hidden = false; $('#create-phrases').focus(); });
@@ -151,5 +214,6 @@ window.addEventListener('beforeunload', (e) => {
     if (store.saving()) e.preventDefault();
 });
 
+showPrefs();
 render();
 load();
