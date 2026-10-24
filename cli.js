@@ -54,6 +54,8 @@ Routines (<routine> = name, phrase or id)
                                 run a routine now, as if it had been said to that Echo
   delete <routine> --apply
   audit                         routines whose target device no longer exists
+  snapshot                      routines, devices, appliances, skills and audit over one connection, as JSON
+                                lines ({"kind", "data"}) printed as each part is ready
 
   Without --apply, commands that change something only print what they would do.
   --json                        raw JSON output (devices, appliances, skills, routines, audit)`;
@@ -180,11 +182,14 @@ function skillIdOf(appliance) {
 
 // Enabled skills (Amazon's "your skills" page) merged with the skills that provide smart-home devices: the page
 // leaves most smart-home skills out (TCL, Smart Life, Tapo), the devices name them.
-async function skills(alexa) {
+async function skills(alexa, knownAppliances) {
     const byId = new Map();
-    const listed = await viaCallback((cb) => alexa.getSkills(cb)).catch(() => []);
+    const [listed, apps] = await Promise.all([
+        viaCallback((cb) => alexa.getSkills(cb)).catch(() => []),
+        knownAppliances || appliances(alexa),
+    ]);
     for (const s of listed || []) byId.set(s.id, { id: s.id, name: s.name, type: s.type, enabled: true, devices: [] });
-    for (const a of await appliances(alexa)) {
+    for (const a of await apps) {
         const id = skillIdOf(a);
         if (!id) continue;
         if (!byId.has(id)) byId.set(id, { id, name: null, type: 'SMART_HOME', enabled: null, devices: [] });
@@ -533,21 +538,44 @@ const commands = {
     },
 
     async audit(alexa, args) {
-        const [list, devs, apps] = await Promise.all([routines(alexa), smartHomeDevices(alexa), appliances(alexa)]);
-        const known = new Set([...devs, ...apps].flatMap(deviceIds));
-        const names = new Map([...devs, ...apps].flatMap((d) => deviceIds(d).map((id) => [id, deviceName(d)])));
-        const broken = list
-            .map((r) => ({ name: routineLabel(r), automationId: r.automationId,
-                missing: routineTargets(r).filter((t) => !known.has(t.target))
-                    .map((t) => ({ ...t, name: names.get(t.target) || null })) }))
-            .filter((r) => r.missing.length);
+        const broken = brokenRoutines(...await Promise.all([routines(alexa), smartHomeDevices(alexa), appliances(alexa)]));
         if (args.json) return console.log(JSON.stringify(broken, null, 2));
         for (const r of broken) {
             console.log(`${r.name}\t${r.automationId}\n  missing: ${r.missing.map((t) => `${t.op} ${t.name || t.target}`).join(', ')}`);
         }
         console.log(broken.length ? `${broken.length} routine(s) point at devices that no longer exist` : 'no broken routine');
     },
+
+    // Everything the interface shows, over one connection, one JSON line per part as soon as it is ready:
+    // routines first (the main view), the audit last, computed from what was already fetched.
+    async snapshot(alexa) {
+        const emit = (kind, data) => process.stdout.write(`${JSON.stringify({ kind, data })}\n`);
+        const fail = (kind) => (e) => {
+            emit('error', { kind, message: e.message || String(e) });
+            return null;
+        };
+        const list = routines(alexa).then((d) => (emit('routines', d), d), fail('routines'));
+        const devs = smartHomeDevices(alexa).then((d) => (emit('devices', d), d), fail('devices'));
+        const apps = appliances(alexa).then((d) => (emit('appliances', d), d), fail('appliances'));
+        const done = [
+            skills(alexa, apps.then((a) => a || [])).then((d) => emit('skills', d), fail('skills')),
+            Promise.all([list, devs, apps]).then(([l, d, a]) => {
+                if (l && d && a) emit('audit', brokenRoutines(l, d, a));
+            }),
+        ];
+        await Promise.all(done);
+    },
 };
+
+function brokenRoutines(list, devs, apps) {
+    const known = new Set([...devs, ...apps].flatMap(deviceIds));
+    const names = new Map([...devs, ...apps].flatMap((d) => deviceIds(d).map((id) => [id, deviceName(d)])));
+    return list
+        .map((r) => ({ name: routineLabel(r), automationId: r.automationId,
+            missing: routineTargets(r).filter((t) => !known.has(t.target))
+                .map((t) => ({ ...t, name: names.get(t.target) || null })) }))
+        .filter((r) => r.missing.length);
+}
 
 async function setStatus(alexa, args, status) {
     const r = findRoutine(await routines(alexa), args._[1] || '');

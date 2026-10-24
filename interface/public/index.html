@@ -19,6 +19,7 @@
       <button role="tab" data-tab="skills">Skills</button>
       <button role="tab" data-tab="audit">Audit</button>
     </nav>
+    <span id="sync" class="sync" role="status" aria-live="polite"></span>
     <button class="ghost" id="refresh" title="Recharger depuis Alexa">Actualiser</button>
   </header>
 
@@ -74,17 +75,15 @@
   <dialog id="confirm">
     <form method="dialog">
       <h2 id="confirm-title">Confirmer</h2>
-      <p class="hint">Simulation de la CLI : rien n'a encore été modifié.</p>
-      <pre id="confirm-plan"></pre>
-      <label class="check" id="confirm-force-row" hidden><input type="checkbox" id="confirm-force"> Forcer malgré les routines qui l'utilisent</label>
+      <p id="confirm-text"></p>
       <div class="actions">
         <button value="cancel" class="ghost">Annuler</button>
-        <button value="ok" class="danger" id="confirm-ok">Appliquer</button>
+        <button value="ok" class="primary" id="confirm-ok">Confirmer</button>
       </div>
     </form>
   </dialog>
 
-  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="toasts" aria-live="polite"></div>
   <script src="app.js"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.PORT) || 3457;
@@ -41,6 +41,53 @@ function runCli(argv) {
     }));
     queue = job.catch(() => {});
     return job;
+}
+
+// Last line received for each part of the snapshot, sent first to a new page so it renders at once.
+const cache = new Map();
+
+// Streams `cli.js snapshot` (one JSON line per part) to the page as each line arrives, after the cached copy.
+function streamSnapshot(req, res) {
+    res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+    });
+    for (const line of cache.values()) res.write(`${JSON.stringify({ ...JSON.parse(line), cached: true })}\n`);
+    let child = null;
+    req.on('close', () => child && child.kill());
+    const job = queue.then(() => new Promise((resolve) => {
+        if (res.writableEnded || req.destroyed) return resolve();
+        child = spawn(process.execPath, [CLI, 'snapshot'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        const timer = setTimeout(() => child.kill(), CLI_TIMEOUT_MS);
+        let pending = '';
+        let stderr = '';
+        child.stdout.setEncoding('utf8');
+        child.stdout.on('data', (chunk) => {
+            pending += chunk;
+            let nl;
+            while ((nl = pending.indexOf('\n')) >= 0) {
+                const line = pending.slice(0, nl);
+                pending = pending.slice(nl + 1);
+                if (!line.trim()) continue;
+                try {
+                    const { kind } = JSON.parse(line);
+                    if (kind !== 'error') cache.set(kind, line);
+                } catch {
+                    continue;
+                }
+                res.write(`${line}\n`);
+            }
+        });
+        child.stderr.on('data', (c) => { stderr += c; });
+        child.on('close', (code) => {
+            clearTimeout(timer);
+            if (code) res.write(`${JSON.stringify({ kind: 'error', data: { kind: 'snapshot', message: stderr.trim().replace(/^error: /, '') || `exit ${code}` } })}\n`);
+            res.end();
+            resolve();
+        });
+    }));
+    queue = job.catch(() => {});
 }
 
 function text(value, what) {
@@ -105,6 +152,8 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${host}`);
 
     try {
+        if (req.method === 'GET' && url.pathname === '/api/snapshot') return streamSnapshot(req, res);
+
         if (req.method === 'GET' && url.pathname.startsWith('/api/list/')) {
             const kind = url.pathname.slice('/api/list/'.length);
             if (!READS.has(kind)) return send(res, 404, { error: 'unknown list' });
