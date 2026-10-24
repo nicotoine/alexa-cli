@@ -61,10 +61,14 @@ export function useApp() {
         if (!silent) setSync({ state: 'loading', text: 'Chargement…' });
         loading.current = (async () => {
             let fresh = 0;
+            let loggedOut = false;
             try {
                 for await (const msg of snapshot()) {
                     if (msg.kind === 'error') {
-                        if (NEEDS_LOGIN.test(msg.data.message)) setNeedsLogin(true);
+                        if (NEEDS_LOGIN.test(msg.data.message)) {
+                            setNeedsLogin(true);
+                            loggedOut = true;
+                        }
                         else {
                             const id = core.activity.add({ label: `Chargement (${msg.data.kind})`, state: 'running' });
                             core.activity.update(id, { state: 'failed', detail: explain(msg.data.message), retry: () => core.load() });
@@ -75,9 +79,10 @@ export function useApp() {
                     if (msg.cached) setSync({ state: 'cached', text: 'Cache, mise à jour…' });
                     else fresh++;
                 }
+                // Not signed in is not offline: the server answered, Amazon has no session for it yet.
                 setSync(fresh
                     ? { state: 'ok', text: `À jour · ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` }
-                    : { state: 'error', text: 'Hors ligne' });
+                    : loggedOut ? { state: 'error', text: 'Non connecté' } : { state: 'error', text: 'Hors ligne' });
             } catch (e) {
                 setSync({ state: 'error', text: 'Hors ligne' });
                 if (!silent) {

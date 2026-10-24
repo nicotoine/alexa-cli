@@ -29,7 +29,7 @@ c'est l'heure du réveil  turnOn 5e46ba56-bbb3-4992-…      amzn1.alexa.automat
 ## Contents
 
 - [Install](#install) · [Sign in](#sign-in) · [Commands](#commands) · [Output for scripts](#output-for-scripts)
-- [Web interface](#web-interface) · [How it works](#how-it-works) · [Troubleshooting](#troubleshooting)
+- [Web interface](#web-interface) · [Android app](#android-app) · [How it works](#how-it-works) · [Troubleshooting](#troubleshooting)
 - [Development](#development) · [Licence](#licence)
 
 ## Install
@@ -201,6 +201,44 @@ A React + [Ionic](https://ionicframework.com/) app over the CLI, built for a pho
 
 `npm run ui:dev` serves the app with hot reload (Vite), talking to `npm run ui` for the data.
 
+## Android app
+
+The same interface and the same CLI in one APK, **with nothing else to run**: Node.js is embedded
+([nodejs-mobile](https://github.com/nodejs-mobile/nodejs-mobile) 18.20, through
+[capacitor-nodejs](https://github.com/hampoelz/capacitor-nodejs)), the interface server and the Amazon login proxy run
+inside the app on `127.0.0.1`, and the session lives in the app's private storage.
+
+**Install.** Take the APK from the [releases](https://github.com/nicotoine/alexa-cli/releases) (or the `apk`
+artifact of a CI run), open it on the phone and allow installing from that source. At first launch, **Se connecter à
+Amazon** opens Amazon's own sign-in page inside the app; once signed in, go back — the routines load.
+
+**Build it here.** Node 22+, JDK 21 and the Android SDK (`~/Android/Sdk`):
+
+```bash
+scripts/build-apk.sh                      # debug APK, every architecture (~160 MB)
+scripts/build-apk.sh --abi arm64-v8a      # one architecture: current phones (~58 MB)
+scripts/build-apk.sh --release --abi arm64-v8a    # signed with your key (below)
+```
+
+The APK lands in `dist/`. Under the hood: `interface/app` is built, `mobile/www/nodejs` receives the CLI, the
+interface server, the built page and the production dependencies (13 MB), `mobile/src/main.cjs` starts the server
+in-process, `mobile/src/loader.html` waits for it, and Capacitor + Gradle package it all.
+
+**Signing key**, once, kept out of the repository:
+
+```bash
+keytool -genkeypair -v -keystore ~/alexa-cli.jks -alias alexa-cli -keyalg RSA -keysize 4096 -validity 10000
+export ALEXA_CLI_KEYSTORE=~/alexa-cli.jks ALEXA_CLI_KEY_ALIAS=alexa-cli \
+       ALEXA_CLI_KEYSTORE_PASSWORD=… ALEXA_CLI_KEY_PASSWORD=…
+```
+
+A release signed with the same key installs over the previous one; debug builds do not.
+
+**CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the tests and builds the interface on every
+push; on a tag `v*` (or by hand) it builds the arm64 APK and attaches it to the GitHub release. With the secrets
+`ALEXA_CLI_KEYSTORE_BASE64` (`base64 -w0 ~/alexa-cli.jks`), `ALEXA_CLI_KEYSTORE_PASSWORD`, `ALEXA_CLI_KEY_ALIAS` and
+`ALEXA_CLI_KEY_PASSWORD`, it is a signed release; without them, a debug APK.
+
 ## How it works
 
 The Alexa app reads routines from `/api/behaviors/v2/automations` but writes them through
@@ -252,6 +290,8 @@ interface/
   app/                    the React + Ionic app (Vite): src/lib (pure, tested: store, activity, actions, listing,
                           model, prefs, api, explain), src/state, src/components, src/views
   test/
+mobile/                   the Android app: Capacitor project (android/), src/main.cjs (Node entry), src/loader.html
+scripts/build-apk.sh      builds the APK into dist/
 test/                     node:test suites; command_surface.json pins every command and option
 ```
 

@@ -1,0 +1,75 @@
+apply plugin: 'com.android.application'
+
+// The app's version is alexa-cli's (package.json at the repo root); versionCode grows with it.
+def cliVersion = new groovy.json.JsonSlurper().parse(file('../../../package.json')).version
+def (major, minor, patch) = cliVersion.tokenize('.').collect { it.replaceAll('[^0-9].*', '') as int }
+
+android {
+    namespace = "io.github.nicotoine.alexacli"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "io.github.nicotoine.alexacli"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode major * 10000 + minor * 100 + patch
+        versionName cliVersion
+        // scripts/build-apk.sh --abi arm64-v8a: one architecture only. Embedded Node.js is ~40 MB per architecture.
+        if (project.hasProperty('alexaAbi')) {
+            ndk { abiFilters project.property('alexaAbi') }
+        }
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // The release key never enters the repository: scripts/build-apk.sh --release (and the CI) pass it through the
+    // environment.
+    signingConfigs {
+        release {
+            if (System.getenv('ALEXA_CLI_KEYSTORE')) {
+                storeFile file(System.getenv('ALEXA_CLI_KEYSTORE'))
+                storePassword System.getenv('ALEXA_CLI_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ALEXA_CLI_KEY_ALIAS')
+                keyPassword System.getenv('ALEXA_CLI_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

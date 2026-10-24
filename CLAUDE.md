@@ -17,6 +17,8 @@ src/client.js          the Alexa API. The only module that imports alexa-remote2
 src/context.js         the client, connected on first use; act() — the --apply guard
 src/ui.js              human / --plain / --json
 interface/server/      app.js (routes, protections), writes.js (whitelist), cli-runner.js (subprocess or in-process), journal.js
+mobile/                the Android app: Capacitor 8 + capacitor-nodejs. src/main.cjs starts the interface server
+                       in-process (no child processes on a phone); scripts/build-apk.sh assembles and builds it.
 interface/app/src/lib/ the page's logic, pure and tested in Node: store (optimistic), activity (queue), actions,
                        listing (sort/filter), model, prefs, api, explain. React lives in components/, views/, state/.
 ```
@@ -40,6 +42,8 @@ run }` objects and `commands/index.js` registers them; a module never imports `c
 - **Every network call goes through `AlexaClient`.** `model.js` stays testable without a network; a write that needs
   `/operation/validate` receives it as a function.
 - **Write bodies go through `asciiJson`.** Never `JSON.stringify` a body sent to Amazon.
+- **Runtime code stays Node 18.** The APK embeds nodejs-mobile 18.20: no toSorted, Object.groupBy, withResolvers,
+  import.meta.dirname… in src/ or interface/server/ (checked by running the server under Node 18).
 - **Create is never retried.** A lost answer to a POST that went through would duplicate the routine.
 - **The page renders through React only.** Amazon's text is never set as HTML (no dangerouslySetInnerHTML).
 - **The editor writes specs with the CLI's code.** It imports `@cli/routine-spec.js`; never re-implement the

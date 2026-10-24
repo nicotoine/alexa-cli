@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Alexa</string>
+    <string name="title_activity_main">Alexa</string>
+    <string name="package_name">io.github.nicotoine.alexacli</string>
+    <string name="custom_url_scheme">io.github.nicotoine.alexacli</string>
+</resources>

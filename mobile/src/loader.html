@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- What the app shows while the embedded Node.js starts: it waits for the interface server on 127.0.0.1:3457, then
+     opens it. Nothing here talks to Amazon. -->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Alexa</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f7f9; --text: #16191f; --muted: #5d6675; --accent: #0077b3; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #121212; --text: #e8ecf1; --muted: #9aa4b2; --accent: #38b6ec; } }
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+    main { text-align: center; padding: 24px; }
+    .ring { width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 50%; border: 6px solid color-mix(in srgb, var(--accent) 25%, transparent);
+      border-top-color: var(--accent); animation: spin 1s linear infinite; }
+    p { margin: 4px 0; } .muted { color: var(--muted); font-size: 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .ring { animation: none; } }
+  </style>
+</head>
+<body>
+  <main role="status" aria-live="polite">
+    <div class="ring" aria-hidden="true"></div>
+    <p id="message">Démarrage…</p>
+    <p class="muted" id="detail">Le moteur de l'application se lance sur ce téléphone.</p>
+  </main>
+  <script>
+    // A no-cors request resolves (opaque) as soon as something listens: that is all that is needed to know the
+    // server is up. Then the app moves to it; the back button and the Amazon login stay inside the app.
+    const URL_UI = 'http://127.0.0.1:3457/';
+    const started = Date.now();
+    async function wait() {
+      for (;;) {
+        try {
+          await fetch(URL_UI, { mode: 'no-cors', cache: 'no-store' });
+          window.location.replace(URL_UI);
+          return;
+        } catch {
+          const seconds = Math.round((Date.now() - started) / 1000);
+          if (seconds > 20) {
+            document.getElementById('message').textContent = 'Le démarrage prend plus de temps que prévu…';
+            document.getElementById('detail').textContent = `${seconds} s. Si rien ne bouge, ferme l'appli et rouvre-la.`;
+          }
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+    }
+    wait();
+  </script>
+</body>
+</html>

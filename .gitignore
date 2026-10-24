@@ -5,3 +5,7 @@ auth.json
 .DS_Store
 coverage/
 interface/app/dist/
+dist/
+mobile/www/
+*.keystore
+*.jks
