@@ -1,0 +1,29 @@
+{
+  "name": "alexa-cli",
+  "version": "0.1.0",
+  "description": "Alexa smart-home devices and voice routines from the command line (unofficial Alexa API)",
+  "keywords": [
+    "alexa",
+    "echo",
+    "routines",
+    "smart-home",
+    "cli"
+  ],
+  "author": "nicotoine",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "alexa-remote2": "^8.1.1"
+  },
+  "private": true,
+  "bin": {
+    "alexa-cli": "cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicotoine/alexa-cli.git"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
