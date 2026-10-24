@@ -4,6 +4,10 @@
 import { IonButton, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonModal, IonSearchbar, IonTitle, IonToolbar } from '@ionic/react';
 import { checkmark, chevronDown, close } from 'ionicons/icons';
 import { useMemo, useState } from 'react';
+import { targetName } from '../lib/model.js';
+
+// A group target ("all the lights") or a device that no longer exists is shown by what it means, its value kept.
+const shownName = (value) => (value ? targetName(value, new Map()) || value : null);
 
 export default function DevicePicker({ value, devices, onChange, label = 'Appareil' }) {
     const [open, setOpen] = useState(false);
@@ -17,8 +21,8 @@ export default function DevicePicker({ value, devices, onChange, label = 'Appare
     };
     return (
         <>
-            <IonButton fill="outline" onClick={() => setOpen(true)} style={{ textTransform: 'none', minWidth: 180 }} aria-label={`${label} : ${value || 'aucun'}`}>
-                <span style={{ flex: 1, textAlign: 'left' }}>{value || 'Choisir…'}</span>
+            <IonButton fill="outline" onClick={() => setOpen(true)} style={{ textTransform: 'none', minWidth: 180 }} aria-label={`${label} : ${shownName(value) || 'aucun'}`}>
+                <span style={{ flex: 1, textAlign: 'left' }}>{shownName(value) || 'Choisir…'}</span>
                 <IonIcon slot="end" icon={chevronDown} />
             </IonButton>
             <IonModal isOpen={open} onDidDismiss={() => setOpen(false)} initialBreakpoint={0.85} breakpoints={[0, 0.85, 1]}>
