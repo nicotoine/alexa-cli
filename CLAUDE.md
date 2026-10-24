@@ -45,6 +45,8 @@ run }` objects and `commands/index.js` registers them; a module never imports `c
 - **Write bodies go through `asciiJson`.** Never `JSON.stringify` a body sent to Amazon.
 - **Runtime code stays Node 18.** The APK embeds nodejs-mobile 18.20: no toSorted, Object.groupBy, withResolvers,
   import.meta.dirname… in src/ or interface/server/ (checked by running the server under Node 18).
+- **`mobile/android/app/oss-signing.keystore` is public on purpose.** Every APK is signed with it so each version
+  installs over the previous one. Never regenerate or replace it: every installed copy would refuse the update.
 - **Create is never retried.** A lost answer to a POST that went through would duplicate the routine.
 - **The page renders through Svelte only.** Amazon's text is never set as HTML (no `{@html}`).
 - **`app.view` is a new object on every change.** The store patches its view in place; a `$derived` handed the same

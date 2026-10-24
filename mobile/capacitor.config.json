@@ -1,6 +1,6 @@
 {
   "appId": "io.github.nicotoine.alexacli",
-  "appName": "Alexa",
+  "appName": "Alexa CLI",
   "webDir": "www",
   "server": {
     "cleartext": true,

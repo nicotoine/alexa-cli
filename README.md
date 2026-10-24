@@ -209,36 +209,42 @@ The same interface and the same CLI in one APK, **with nothing else to run**: No
 [capacitor-nodejs](https://github.com/hampoelz/capacitor-nodejs)), the interface server and the Amazon login proxy run
 inside the app on `127.0.0.1`, and the session lives in the app's private storage.
 
-**Install.** Take the APK from the [releases](https://github.com/nicotoine/alexa-cli/releases) (or the `apk`
-artifact of a CI run), open it on the phone and allow installing from that source. At first launch, **Se connecter à
-Amazon** opens Amazon's own sign-in page inside the app; once signed in, go back — the routines load.
+**Install.** Download **[alexa-cli-universal.apk](https://github.com/nicotoine/alexa-cli/releases/latest/download/alexa-cli-universal.apk)**
+from the [latest release](https://github.com/nicotoine/alexa-cli/releases/latest), open it on the phone and allow
+installing from that source. It runs on any Android 7+ phone; the release also has lighter APKs, one per processor:
+`arm64-v8a` (most current phones), `armeabi-v7a` (32-bit phones, older or entry-level), `x86_64` (emulators). At
+first launch, **Se connecter à Amazon** opens Amazon's own sign-in page inside the app; once signed in, go back — the
+routines load. Each new version installs over the previous one.
+
+**Versions.** `<major>.<minor>` come from `package.json` (`npm version minor` starts a new series); the patch is the
+build number, the count of commits on `main`. Every push to `main` makes a GitHub release `v0.2.<build>`.
 
 **Build it here.** Node 22+, JDK 21 and the Android SDK (`~/Android/Sdk`):
 
 ```bash
-scripts/build-apk.sh                      # debug APK, every architecture (~160 MB)
-scripts/build-apk.sh --abi arm64-v8a      # one architecture: current phones (~58 MB)
-scripts/build-apk.sh --release --abi arm64-v8a    # signed with your key (below)
+scripts/build-apk.sh                      # universal (~160 MB) + one APK per architecture (~55 MB each)
+scripts/build-apk.sh --abi arm64-v8a      # one architecture only
+scripts/build-apk.sh --debug              # debuggable
 ```
 
-The APK lands in `dist/`. Under the hood: `interface/app` is built, `mobile/www/nodejs` receives the CLI, the
+The APKs land in `dist/`. Under the hood: `interface/app` is built, `mobile/www/nodejs` receives the CLI, the
 interface server, the built page and the production dependencies (13 MB), `mobile/src/main.cjs` starts the server
 in-process, `mobile/src/loader.html` waits for it, and Capacitor + Gradle package it all.
 
-**Signing key**, once, kept out of the repository:
+**Signing.** Every build is signed with the open-source key committed in `mobile/android/app/oss-signing.keystore`,
+**public on purpose**: it only makes each version install over the previous one, wherever it was built. It proves
+nothing about who built an APK — take APKs from this repository's releases only. To sign with a private key instead,
+give it in the environment (switching keys means uninstalling once):
 
 ```bash
-keytool -genkeypair -v -keystore ~/alexa-cli.jks -alias alexa-cli -keyalg RSA -keysize 4096 -validity 10000
 export ALEXA_CLI_KEYSTORE=~/alexa-cli.jks ALEXA_CLI_KEY_ALIAS=alexa-cli \
        ALEXA_CLI_KEYSTORE_PASSWORD=… ALEXA_CLI_KEY_PASSWORD=…
 ```
 
-A release signed with the same key installs over the previous one; debug builds do not.
-
-**CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the tests and builds the interface on every
-push; on a tag `v*` (or by hand) it builds the arm64 APK and attaches it to the GitHub release. With the secrets
-`ALEXA_CLI_KEYSTORE_BASE64` (`base64 -w0 ~/alexa-cli.jks`), `ALEXA_CLI_KEYSTORE_PASSWORD`, `ALEXA_CLI_KEY_ALIAS` and
-`ALEXA_CLI_KEY_PASSWORD`, it is a signed release; without them, a debug APK.
+**CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the tests and builds the interface on every push
+and pull request; on every push to `main` it builds the APKs and publishes the release, with a `SHA256SUMS`. The
+secrets `ALEXA_CLI_KEYSTORE_BASE64` (`base64 -w0 ~/alexa-cli.jks`), `ALEXA_CLI_KEYSTORE_PASSWORD`,
+`ALEXA_CLI_KEY_ALIAS` and `ALEXA_CLI_KEY_PASSWORD`, when set, switch it to a private key.
 
 ## How it works
 
@@ -292,7 +298,7 @@ interface/
                           actions, listing, model, prefs, api, explain), src/lib/state, components, views
   test/
 mobile/                   the Android app: Capacitor project (android/), src/main.cjs (Node entry), src/loader.html
-scripts/build-apk.sh      builds the APK into dist/
+scripts/build-apk.sh      builds the APKs into dist/
 test/                     node:test suites; command_surface.json pins every command and option
 ```
 

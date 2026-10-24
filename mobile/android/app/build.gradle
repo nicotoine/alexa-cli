@@ -27,10 +27,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // The release key never enters the repository: scripts/build-apk.sh --release (and the CI) pass it through the
-    // environment.
+    // Without --abi: one APK per architecture, and a universal one with all three. Same versionCode for all: they
+    // are sideloaded, never sent to a store.
+    splits {
+        abi {
+            enable !project.hasProperty('alexaAbi')
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            universalApk true
+        }
+    }
+    // Every build is signed with the same key, so each one installs over the previous one. By default the open-source
+    // key in this directory (public on purpose: it proves nothing about who built the APK, only that updates fit).
+    // A private key given in the environment (ALEXA_CLI_KEYSTORE…, the CI's secrets) takes its place.
     signingConfigs {
-        release {
+        oss {
+            storeFile file('oss-signing.keystore')
+            storePassword 'alexa-cli-oss'
+            keyAlias 'alexa-cli'
+            keyPassword 'alexa-cli-oss'
+        }
+        own {
             if (System.getenv('ALEXA_CLI_KEYSTORE')) {
                 storeFile file(System.getenv('ALEXA_CLI_KEYSTORE'))
                 storePassword System.getenv('ALEXA_CLI_KEYSTORE_PASSWORD')
@@ -40,8 +57,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig System.getenv('ALEXA_CLI_KEYSTORE') ? signingConfigs.own : signingConfigs.oss
+        }
         release {
-            signingConfig signingConfigs.release
+            signingConfig System.getenv('ALEXA_CLI_KEYSTORE') ? signingConfigs.own : signingConfigs.oss
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
