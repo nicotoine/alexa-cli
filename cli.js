@@ -479,7 +479,12 @@ const commands = {
         const devices = await smartHomeDevices(alexa);
         let targets = routineTargets(r);
         if (args.from) {
-            const from = new Set(deviceIds(findByName([...devices, ...await appliances(alexa)], args.from, 'device')));
+            // The same device is listed twice (as a routine entity and as an appliance): take every id of the name.
+            const k = args.from.toLowerCase();
+            const from = new Set([...devices, ...await appliances(alexa)]
+                .filter((d) => deviceName(d).toLowerCase() === k || deviceIds(d).includes(args.from))
+                .flatMap(deviceIds));
+            if (!from.size) throw new Error(`no device is named "${args.from}"`);
             targets = targets.filter((t) => from.has(t.target));
         }
         if (targets.length !== 1) {
