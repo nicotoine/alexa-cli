@@ -1,53 +1,64 @@
-// Every change the page can make, drawn at once and sent in the background. A deletion waits a few seconds behind
-// an "Annuler" toast before anything is sent; a refusal undoes the drawing and says why, with a way to retry.
+// Every change the page can make: drawn at once (store), followed in the activity queue (activity), sent in the
+// background (change). A deletion waits behind an undo window before anything is sent; a refusal undoes the
+// drawing and the queue says why, with a retry. Pure of the DOM: tested in Node.
 
+import { fromSpec } from '../../../../src/routine-spec.js';
 import { editedPhrases, eachAction, idsOfName, label } from './model.js';
 
 const findRoutine = (view, id) => (view.routines || []).find((r) => r.automationId === id);
 
-export function createActions({ store, change, toast, explain, resync = () => {}, undoMs = 5000, schedule = setTimeout, unschedule = clearTimeout }) {
+export function createActions({ store, change, activity, explain, resync = () => {}, undoMs = 5000, schedule = setTimeout, unschedule = clearTimeout }) {
     let tempSeq = 0;
 
-    /** Resolves once the change is sent and answered, undone, or refused. */
+    /** Resolves once the change is answered, undone or refused. */
     function optimistic(spec) {
         const { key, kinds, patch, command, body, what, done, undo = false, onError } = spec;
         const op = store.begin({ key, kinds, patch });
+        let id = null;
 
         const fail = (message) => {
             store.cancel(op);
-            if (onError && onError(message)) return;
-            toast(`Échec : ${what}`, { type: 'error', detail: explain(message), action: { label: 'Réessayer', run: () => optimistic({ ...spec, undo: false }) } });
+            if (onError && onError(message, id)) return;
+            activity.update(id, {
+                state: 'failed',
+                detail: explain(message),
+                retry: () => {
+                    activity.dismiss(id);
+                    return optimistic({ ...spec, undo: false });
+                },
+            });
         };
 
         const send = async () => {
+            activity.update(id, { state: 'running', deadline: null, undo: null });
             try {
                 await change(command, { ...body, apply: true });
                 store.confirm(op);
-                if (done) toast(done, { type: 'success' });
+                activity.update(id, { state: 'done', detail: done || null });
                 resync();
             } catch (e) {
                 fail(e.message);
             }
         };
 
-        if (!undo) return send();
+        if (!undo) {
+            id = activity.add({ label: what, state: 'running' });
+            return send();
+        }
         return new Promise((resolve) => {
             let timer = null;
-            const dismiss = toast(what, {
-                duration: undoMs,
-                action: {
-                    label: 'Annuler',
-                    run: () => {
-                        unschedule(timer);
-                        store.cancel(op);
-                        resolve();
-                    },
+            id = activity.add({
+                label: what,
+                state: 'waiting',
+                deadline: Date.now() + undoMs,
+                undo: () => {
+                    unschedule(timer);
+                    store.cancel(op);
+                    activity.update(id, { state: 'cancelled', undo: null, deadline: null, detail: 'Annulé' });
+                    resolve();
                 },
             });
-            timer = schedule(() => {
-                dismiss();
-                send().then(resolve);
-            }, undoMs);
+            timer = schedule(() => send().then(resolve), undoMs);
         });
     }
 
@@ -62,7 +73,7 @@ export function createActions({ store, change, toast, explain, resync = () => {}
                 patch: (v) => { const x = findRoutine(v, id); if (x) x.status = status; },
                 command: on ? 'enable' : 'disable', body: { target: id },
                 what: `${on ? 'Activer' : 'Désactiver'} « ${label(r)} »`,
-                done: `« ${label(r)} » ${on ? 'activée' : 'désactivée'}`,
+                done: on ? 'Activée' : 'Désactivée',
             });
         },
 
@@ -80,7 +91,7 @@ export function createActions({ store, change, toast, explain, resync = () => {}
                 },
                 command: 'phrases', body: { target: id, add, remove },
                 what: `${what} — ${label(r)}`,
-                done: `${what} : enregistré`,
+                done: 'Enregistré',
             });
         },
 
@@ -93,8 +104,8 @@ export function createActions({ store, change, toast, explain, resync = () => {}
                     if (v.audit) v.audit = v.audit.filter((x) => x.automationId !== id);
                 },
                 command: 'delete', body: { target: id },
-                what: `Routine « ${label(r)} » supprimée`,
-                done: `« ${label(r)} » supprimée chez Amazon`,
+                what: `Supprimer « ${label(r)} »`,
+                done: 'Supprimée chez Amazon',
                 undo: true,
             });
         },
@@ -111,26 +122,37 @@ export function createActions({ store, change, toast, explain, resync = () => {}
                 },
                 command: 'retarget', body: { target: id, device: toName, ...(fromName ? { from: fromName } : {}) },
                 what: `« ${label(r)} » → ${toName}`,
-                done: `« ${label(r)} » vise maintenant ${toName}`,
+                done: `Vise maintenant ${toName}`,
             });
         },
 
-        create(phrases, device, op) {
-            const tempId = `pending-${++tempSeq}`;
-            const target = [...idsOfName(store.view, device)][0];
+        /**
+         * A whole routine from the editor: created, or replacing `existing` (same id). Drawn with the same
+         * translation the CLI uses, so what shows is what will be written.
+         */
+        save(spec, existing = null) {
+            let drawn;
+            try {
+                drawn = fromSpec(spec, { devices: store.view.devices || [], echos: store.view.echos || [], customerId: 'pending' });
+            } catch (e) {
+                const id = activity.add({ label: `Enregistrer « ${spec.name || 'routine'} »`, state: 'running' });
+                activity.update(id, { state: 'failed', detail: explain(e.message) });
+                return Promise.resolve();
+            }
+            const id = existing ? existing.automationId : `draft-${++tempSeq}`;
+            const routine = { ...drawn, automationId: id, ...(existing ? {} : { draft: true }) };
             return optimistic({
-                key: tempId, kinds: ['routines'],
+                key: id, kinds: ['routines'],
                 patch: (v) => {
-                    if (!v.routines || v.routines.some((x) => x.automationId === tempId)) return;
-                    v.routines.push({
-                        automationId: tempId, name: phrases[0], status: 'ENABLED', draft: true,
-                        triggers: [{ type: 'CustomUtterance', payload: { utterance: phrases[0], utterances: phrases } }],
-                        sequence: { startNode: { '@type': 'OpaquePayloadOperationNode', operationPayload: { target, operations: [{ type: op }] } } },
-                    });
+                    if (!v.routines) return;
+                    const at = v.routines.findIndex((x) => x.automationId === id);
+                    if (at >= 0) v.routines[at] = structuredClone(routine);
+                    else v.routines.push(structuredClone(routine));
                 },
-                command: 'create', body: { phrase: phrases, device, op },
-                what: `Créer « ${phrases[0]} »`,
-                done: `Routine « ${phrases[0]} » créée`,
+                command: existing ? 'update' : 'create',
+                body: existing ? { target: existing.automationId, spec } : { spec },
+                what: `${existing ? 'Modifier' : 'Créer'} « ${drawn.name} »`,
+                done: existing ? 'Modifiée' : 'Créée',
             });
         },
 
@@ -144,15 +166,15 @@ export function createActions({ store, change, toast, explain, resync = () => {}
                     for (const s of v.skills || []) s.devices = s.devices.filter((d) => d.applianceId !== appliance.applianceId);
                 },
                 command: 'forget', body: { target: appliance.applianceId, ...(force ? { force: true } : {}) },
-                what: `Appareil « ${appliance.friendlyName} » supprimé`,
-                done: `« ${appliance.friendlyName} » supprimé d'Alexa`,
+                what: `Supprimer l'appareil « ${appliance.friendlyName} »`,
+                done: 'Supprimé d\'Alexa',
                 undo: !force,
-                onError: (message) => {
+                onError: (message, id) => {
                     if (!/still used by/.test(message)) return false;
-                    toast(`« ${appliance.friendlyName} » n'a pas été supprimé`, {
-                        type: 'error',
+                    activity.update(id, {
+                        state: 'failed',
                         detail: `${explain(message)} Le supprimer cassera ces routines.`,
-                        action: { label: 'Forcer', run: () => actions.forget(appliance, true) },
+                        action: { label: 'Forcer', run: () => { activity.dismiss(id); return actions.forget(appliance, true); } },
                     });
                     return true;
                 },
@@ -160,14 +182,12 @@ export function createActions({ store, change, toast, explain, resync = () => {}
         },
 
         async run(r) {
-            const dismiss = toast(`Lancement de « ${label(r)} »…`, { duration: 0 });
+            const id = activity.add({ label: `Lancer « ${label(r)} »`, state: 'running' });
             try {
                 await change('run', { target: r.automationId, apply: true });
-                dismiss();
-                toast(`« ${label(r)} » lancée`, { type: 'success' });
+                activity.update(id, { state: 'done', detail: 'Lancée' });
             } catch (e) {
-                dismiss();
-                toast(`Échec du lancement de « ${label(r)} »`, { type: 'error', detail: explain(e.message) });
+                activity.update(id, { state: 'failed', detail: explain(e.message), retry: () => { activity.dismiss(id); return actions.run(r); } });
             }
         },
     };

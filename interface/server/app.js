@@ -4,11 +4,13 @@
 //   GET  /api/snapshot     every list, as JSON lines streamed as they arrive (a cached copy first)
 //   POST /api/do/<command> one change, dry run unless {"apply": true}; answers the CLI's --json document
 //   GET  /api/session      whether a session is stored and accepted
+//   GET  /api/journal      the latest changes the interface applied, newest first
 //   POST /api/login        starts the Amazon login; answers the local page to sign in on
 //   GET  /…                the page (interface/public)
 
 import fs from 'node:fs';
 import path from 'node:path';
+import * as journal from './journal.js';
 import { BadRequest, writeArgv } from './writes.js';
 
 const TYPES = {
@@ -23,10 +25,11 @@ const SECURITY_HEADERS = {
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
-    'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'",
+    // Ionic injects its component styles at run time, hence 'unsafe-inline' for styles; scripts stay 'self' only.
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'",
 };
 
-export function createApp({ runner, publicDir, host, port }) {
+export function createApp({ runner, publicDir, host, port, journalOptions = {} }) {
     // Last line received for each part of the snapshot, sent first so a new page renders at once.
     const cache = new Map();
 
@@ -94,6 +97,16 @@ export function createApp({ runner, publicDir, host, port }) {
             return send(res, 400, { error: e instanceof SyntaxError ? 'invalid JSON' : e.message });
         }
         const result = await runner.run(argv);
+        if (argv.includes('--apply') || command === 'run') {
+            journal.record({
+                command,
+                target: argv[1] && !argv[1].startsWith('--') ? argv[1] : null,
+                ok: result.ok,
+                plan: (result.doc && result.doc.plan) || null,
+                message: (result.doc && result.doc.message) || null,
+                error: result.ok ? null : result.error,
+            }, journalOptions);
+        }
         // The CLI's own failures (a refused phrase, a session to renew) are 422 with its message; the page shows it.
         return send(res, result.ok ? 200 : 422, result.ok ? result.doc : { error: result.error });
     }
@@ -115,6 +128,7 @@ export function createApp({ runner, publicDir, host, port }) {
         try {
             if (req.method === 'GET' && pathname === '/api/snapshot') return snapshot(req, res);
             if (req.method === 'GET' && pathname === '/api/session') return send(res, 200, await runner.session());
+            if (req.method === 'GET' && pathname === '/api/journal') return send(res, 200, journal.read({ ...journalOptions, limit: 100 }));
             if (req.method === 'POST' && pathname === '/api/login') return await login(req, res);
             if (req.method === 'POST' && pathname.startsWith('/api/do/')) return await change(req, res, pathname.slice('/api/do/'.length));
             if (req.method === 'GET' && !pathname.startsWith('/api/')) return file(res, pathname);

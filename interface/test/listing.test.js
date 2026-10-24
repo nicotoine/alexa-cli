@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { deviceFacets, deviceRows, nextDeviceSort, routineDevices, routineRows, skillRows, skillTypes } from '../public/js/listing.js';
-import { DEFAULTS, loadPrefs, savePrefs } from '../public/js/prefs.js';
+import { deviceFacets, deviceRows, nextDeviceSort, routineDevices, routineRows, skillRows, skillTypes } from '../app/src/lib/listing.js';
+import { DEFAULTS, loadPrefs, savePrefs } from '../app/src/lib/prefs.js';
 
 const routine = (id, { status = 'ENABLED', phrases = [id], target, trigger = 'CustomUtterance' } = {}) => ({
     automationId: id, name: id, status,

@@ -39,7 +39,10 @@ const snapshot = {
         const routines = part('routines', client.routines());
         const devices = part('devices', client.entities());
         const appliances = part('appliances', client.appliances());
+        // The Echos (and the Alexa app on each phone) an action can be played on: the routine editor needs them.
+        const echos = part('echos', client.echos());
         await Promise.all([
+            echos,
             part('skills', loadSkills(client, appliances.then((a) => a || []))),
             Promise.all([routines, devices, appliances]).then(([r, d, a]) => r && d && a && emit('audit', brokenRoutines(r, d, a))),
         ]);

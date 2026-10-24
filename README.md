@@ -177,24 +177,29 @@ alexa-cli delete "test" --apply --json | jq .applied
 ## Web interface
 
 ```bash
-npm run ui        # → http://127.0.0.1:3457/
+npm run ui:build   # once, and after an update (install.sh does it)
+npm run ui         # → http://127.0.0.1:3457/
 ```
 
-A page over the CLI: routines (add and remove phrases, enable, run, change device, delete, create), devices with
-the routines that use them, skills, and the audit. Works on a phone.
+A React + [Ionic](https://ionicframework.com/) app over the CLI, built for a phone first and fine on a computer.
 
-- **Sort and filter.** Routines sort by name, status, number of phrases or device, and filter on status, trigger,
-  device and broken references; devices sort on any column header (click again to reverse) and filter on source,
-  maker and whether a routine uses them; skills sort and filter by type. Choices are remembered in the browser.
-
-- **Streamed and cached.** One `snapshot` connection sends each list as soon as it is ready, routines first (about
-  two seconds); the server keeps the last one, so the page draws at once on the next visit and refreshes behind.
-- **Optimistic.** A change is drawn immediately and sent in the background; the card shows "enregistrement…" until
-  Amazon answers. A deletion waits five seconds behind an **Annuler** toast before anything is sent. If Amazon
-  refuses, the change is undone and a toast says why, with **Réessayer** — or **Forcer** for a device still used by a
-  routine. Once nothing is in flight, the page re-syncs quietly.
+- **Routines**: search, sort, filters (folded behind a button on a phone), an on/off switch per routine, phrases
+  added or removed in place, run, delete — and a **routine editor**: name, phrases or a schedule with its days, then
+  the actions as one list reordered by dragging (device on/off with a searchable device picker, say, wait, weather /
+  time / news…, tell Alexa, Fire TV off), on the Echo of your choice. It is checked as you type by the CLI's own rules
+  and written with the CLI's own translation (`src/routine-spec.js`, imported as is).
+- **Devices** (a table sorted by its column headers on a wide screen, a list on a phone), **Skills**, **Audit**.
+- **Activity queue.** Every change is drawn at once and followed in a compact bar at the bottom — a loader while it
+  runs, the outcome after; a deletion waits five seconds with **Annuler**. Tapping the bar opens a sheet with every
+  action (retry, force) and the **journal** of the changes the interface applied, kept in
+  `~/.config/alexa-cli/journal.jsonl`.
+- **Streamed and cached.** One connection sends each list as soon as it is ready, routines first; the server keeps the
+  last one, so the page draws at once and refreshes behind.
+- **Signing in from the page** when no session is accepted (there is no terminal on a phone).
 - **Local only.** The server listens on `127.0.0.1`, refuses any other host name, runs only a whitelist of CLI
   commands with arguments passed without a shell, and requires a header a page from another site cannot send.
+
+`npm run ui:dev` serves the app with hot reload (Vite), talking to `npm run ui` for the data.
 
 ## How it works
 
@@ -242,8 +247,10 @@ src/
   context.js              the lazily connected client, the --apply guard
   ui.js                   human, --plain and --json output
 interface/
-  server/                 app (routes, protections), writes (whitelist), cli-runner (queue, stream), index
-  public/js/              store (optimistic engine), listing (sort, filter), prefs, actions, api, model, toasts, views/ — ES modules, no build
+  server/                 app (routes, protections), writes (whitelist), cli-runner (subprocess / in-process),
+                          journal, index
+  app/                    the React + Ionic app (Vite): src/lib (pure, tested: store, activity, actions, listing,
+                          model, prefs, api, explain), src/state, src/components, src/views
   test/
 test/                     node:test suites; command_surface.json pins every command and option
 ```

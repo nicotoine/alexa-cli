@@ -16,8 +16,9 @@ src/model.js           routines/devices/skills: reading, writing, audit. Pure �
 src/client.js          the Alexa API. The only module that imports alexa-remote2.
 src/context.js         the client, connected on first use; act() — the --apply guard
 src/ui.js              human / --plain / --json
-interface/server/      app.js (routes, protections), writes.js (whitelist), cli-runner.js (queue, stream)
-interface/public/js/   store.js (optimistic engine, no DOM), listing.js (sort, filter — pure), prefs.js, actions.js, api.js, model.js, toasts.js, views/
+interface/server/      app.js (routes, protections), writes.js (whitelist), cli-runner.js (subprocess or in-process), journal.js
+interface/app/src/lib/ the page's logic, pure and tested in Node: store (optimistic), activity (queue), actions,
+                       listing (sort/filter), model, prefs, api, explain. React lives in components/, views/, state/.
 ```
 
 **Commands are declared, not attached.** A command module exports `{ name, group, summary, args, options, modes,
@@ -40,7 +41,9 @@ run }` objects and `commands/index.js` registers them; a module never imports `c
   `/operation/validate` receives it as a function.
 - **Write bodies go through `asciiJson`.** Never `JSON.stringify` a body sent to Amazon.
 - **Create is never retried.** A lost answer to a POST that went through would duplicate the routine.
-- **The page builds DOM with `el()` only.** Amazon's text never goes through `innerHTML`.
+- **The page renders through React only.** Amazon's text is never set as HTML (no dangerouslySetInnerHTML).
+- **The editor writes specs with the CLI's code.** It imports `@cli/routine-spec.js`; never re-implement the
+  translation in the app.
 - **A patch in the store is idempotent and tolerates a list that is still null.** It runs again on every recompute.
 
 ## Tests

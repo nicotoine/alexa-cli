@@ -10,6 +10,7 @@
 #   ./install.sh --bin-dir ~/bin     # link somewhere else
 #   ./install.sh --shell zsh         # completion for another shell
 #   ./install.sh --no-completion     # skip the completion step
+#   ./install.sh --no-ui             # skip building the web interface (React + Ionic, ~140 MB of build tools)
 #   ./install.sh --uninstall         # remove the link and the completion (the Amazon session is kept)
 #
 # Nothing here signs you in: run `alexa-cli login` afterwards.
@@ -19,6 +20,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$HOME/.local/bin"
 SHELL_NAME="$(basename "${SHELL:-bash}")"
 COMPLETION=1
+UI=1
 UNINSTALL=0
 MIN_NODE=22
 
@@ -27,8 +29,9 @@ while [ $# -gt 0 ]; do
         --bin-dir) BIN_DIR="$2"; shift 2 ;;
         --shell) SHELL_NAME="$2"; shift 2 ;;
         --no-completion) COMPLETION=0; shift ;;
+        --no-ui) UI=0; shift ;;
         --uninstall) UNINSTALL=1; shift ;;
-        -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
     esac
 done
@@ -67,6 +70,10 @@ link_bin() {
     esac
 }
 
+build_ui() {
+    cd "$REPO" && npm run --silent ui:build
+}
+
 unlink_bin() {
     if [ -L "$BIN_DIR/alexa-cli" ]; then rm "$BIN_DIR/alexa-cli"; fi
 }
@@ -79,6 +86,11 @@ else
     if [ "$FAILED" = 0 ]; then
         step "dependencies (npm ci)" install_dependencies
         step "link $BIN_DIR/alexa-cli" link_bin
+        if [ "$UI" = 1 ]; then
+            step "web interface (npm run ui:build)" build_ui
+        else
+            skipped "web interface (--no-ui)"
+        fi
         if [ "$COMPLETION" = 1 ]; then
             step "shell completion ($SHELL_NAME)" "$REPO/install-completion.sh" "$SHELL_NAME"
         else

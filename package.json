@@ -29,6 +29,8 @@
   "scripts": {
     "test": "node --test --test-reporter=spec \"test/**/*.test.js\" \"interface/test/**/*.test.js\"",
     "ui": "node interface/server/index.js",
+    "ui:build": "npm --prefix interface/app ci --no-audit --no-fund && npm --prefix interface/app run build",
+    "ui:dev": "npm --prefix interface/app run dev",
     "surface:update": "node test/update-surface.js"
   },
   "engines": {

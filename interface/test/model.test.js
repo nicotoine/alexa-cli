@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { actionsOf, editedPhrases, idsOfName, phraseOwner, phrasesOf, targetName } from '../public/js/model.js';
-import { explain } from '../public/js/toasts.js';
+import { actionsOf, editedPhrases, idsOfName, phraseOwner, phrasesOf, targetName } from '../app/src/lib/model.js';
+import { explain } from '../app/src/lib/explain.js';
 
 const routine = {
     automationId: 'r', name: 'on va dormir',
@@ -46,8 +46,8 @@ describe('error messages', () => {
     for (const [cli, french] of [
         ['error: phrase already used by: pause télé', 'Phrase déjà utilisée par « pause télé ».'],
         ['still used by 2 routine(s): a, b (--force to delete anyway)', 'Encore utilisé par : a, b.'],
-        ['not logged in: run "alexa-cli login" first', 'Non connecté à Amazon : lancez « alexa-cli login ».'],
-        ['401 Unauthorized', 'Session Amazon expirée : relancez « alexa-cli login ».'],
+        ['not logged in: run "alexa-cli login" first', 'Non connecté à Amazon.'],
+        ['401 Unauthorized', 'Session Amazon expirée : reconnecte-toi.'],
         ['Failed to fetch', 'Serveur de l\'interface injoignable.'],
         ['something new', 'something new'],
         ['', 'Erreur inconnue.'],

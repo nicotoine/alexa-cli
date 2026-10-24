@@ -9,7 +9,8 @@ import { createRunner } from './cli-runner.js';
 
 export const HOST = '127.0.0.1';
 export const PORT = Number(process.env.ALEXA_CLI_UI_PORT || process.env.PORT) || 3457;
-const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
+// The built app (npm run ui:build). index.html is what every page path falls back to.
+const PUBLIC_DIR = fileURLToPath(new URL('../app/dist', import.meta.url));
 
 /** Starts the interface; resolves with the server once it listens. */
 export function start({ host = HOST, port = PORT, runner = createRunner(), publicDir = PUBLIC_DIR } = {}) {

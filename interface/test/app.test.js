@@ -3,11 +3,17 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createApp } from '../server/app.js';
 
+const journalFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'alexa-cli-journal-')), 'journal.jsonl');
+
 const HOST = '127.0.0.1';
-const publicDir = fileURLToPath(new URL('../public', import.meta.url));
+// A stand-in for the built app: the server only needs files to serve.
+const publicDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alexa-cli-public-'));
+fs.writeFileSync(path.join(publicDir, 'index.html'), '<!doctype html><title>t</title>');
 const runs = [];
 const runner = {
     async run(argv) {
@@ -35,7 +41,7 @@ before(async () => {
     server = http.createServer((req, res) => app(req, res));
     await new Promise((r) => server.listen(0, HOST, r));
     port = server.address().port;
-    app = createApp({ runner, publicDir, host: HOST, port });
+    app = createApp({ runner, publicDir, host: HOST, port, journalOptions: { file: journalFile } });
 });
 after(() => server.close());
 let app;
@@ -109,6 +115,16 @@ describe('routes', () => {
         assert.equal(r.status, 200);
         assert.deepEqual(JSON.parse(r.body), { applied: true, plan: 'plan' });
         assert.deepEqual(runs.at(-1), ['delete', 'x', '--apply', '--json']);
+    });
+
+    it('journals applied changes, newest first, and not dry runs', async () => {
+        await write('delete', { target: 'dry' });
+        await write('disable', { target: 'r9', apply: true });
+        const entries = JSON.parse((await request('/api/journal')).body);
+        assert.equal(entries[0].command, 'disable');
+        assert.equal(entries[0].target, 'r9');
+        assert.equal(entries[0].ok, true);
+        assert.ok(!entries.some((e) => e.target === 'dry'));
     });
 
     it('answers a refusal with 422 and the CLI message', async () => {

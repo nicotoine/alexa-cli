@@ -38,7 +38,7 @@ describe('in-process runner', () => {
         const lines = [];
         const run = runner.snapshot((line) => lines.push(JSON.parse(line).kind));
         assert.equal((await run.done).ok, true);
-        assert.deepEqual(lines.sort(), ['appliances', 'audit', 'devices', 'routines', 'skills']);
+        assert.deepEqual(lines.sort(), ['appliances', 'audit', 'devices', 'echos', 'routines', 'skills']);
     });
 
     it('drops a refused connection, so the next call connects again', async () => {

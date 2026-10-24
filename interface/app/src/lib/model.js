@@ -38,6 +38,8 @@ export function actionsOf(r) {
     eachAction(r, (p, n) => {
         if (p.target) out.push({ target: p.target, op: (p.operations || []).map((o) => o.type).join(',') });
         else if (p.textToSpeak) out.push({ speak: p.textToSpeak });
+        else if (n.type === 'Alexa.System.Wait') out.push({ wait: p.waitTimeInSeconds });
+        else if (n.type === 'Alexa.TextCommand') out.push({ command: p.text });
         else out.push({ type: n.type });
     });
     return out;

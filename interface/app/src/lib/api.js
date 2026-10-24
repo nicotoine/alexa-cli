@@ -19,6 +19,13 @@ export async function* snapshot(fetchFn = fetch) {
     }
 }
 
+/** The latest changes the interface applied (server journal), newest first. */
+export async function journal(fetchFn = fetch) {
+    const res = await fetchFn('/api/journal');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
 export async function session(fetchFn = fetch) {
     const res = await fetchFn('/api/session');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
