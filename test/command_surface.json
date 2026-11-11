@@ -36,6 +36,10 @@
     "--json MODE",
     "<routine>!"
   ],
+  "alexa-cli discover": [
+    "--json MODE",
+    "--wait STRING"
+  ],
   "alexa-cli enable": [
     "--apply FLAG",
     "--json MODE",

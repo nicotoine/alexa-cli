@@ -67,8 +67,9 @@ export function routines() {
 }
 
 /** A stand-in for AlexaClient that records what was written. */
-export function fakeClient({ routineList = routines(), entities = ENTITIES, appliances = APPLIANCES } = {}) {
+export function fakeClient({ routineList = routines(), entities = ENTITIES, appliances = APPLIANCES, arrivals = [] } = {}) {
     const calls = [];
+    let discovering = false;
     return {
         calls,
         routineList,
@@ -92,5 +93,15 @@ export function fakeClient({ routineList = routines(), entities = ENTITIES, appl
             appliances.splice(appliances.findIndex((a) => a.applianceId === id), 1);
         },
         runRoutine: async (serial, routine) => calls.push(['run', serial, routine.automationId]),
+        // `arrivals`: what Alexa finds after each poll interval, one batch per pause once discovery has started.
+        startDiscovery: async () => {
+            calls.push(['discover']);
+            discovering = true;
+            return {};
+        },
+        pause: async (ms) => {
+            calls.push(['pause', ms]);
+            if (discovering && arrivals.length) appliances.push(...arrivals.shift());
+        },
     };
 }

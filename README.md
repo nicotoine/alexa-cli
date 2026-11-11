@@ -139,7 +139,12 @@ alexa-cli update "on va dormir" --from dormir.json --apply
 | `devices [text]` | devices a routine can target |
 | `appliances [text]` | every device with its source (`matter`, `skill`), maker and reachability |
 | `skills [text]` | enabled skills and the devices each one provides |
+| `discover [--wait SECONDS]` | ask Alexa to look for new devices, as "Alexa, discover devices" does, and list the ones that appear |
 | `forget <device> [--force]` | delete a device; refused while a routine uses it |
+
+`discover` is the way to make Alexa see a device just added to a Matter bridge (Home Assistant Matter Hub): Alexa
+searches for about 45 s, and the command watches the device list every 10 s until the new devices have settled or
+`--wait` (default 90) runs out. `--wait 0` only asks.
 
 `skills` exists because Amazon's own "your skills" page leaves most smart-home skills out: alexa-cli finds them
 through the devices they provide. A device deleted with `forget` that shows up again comes from a skill that is
@@ -155,7 +160,7 @@ still linked — unlink it in the Alexa app.
 | `completion bash\|zsh\|fish` | the completion script (`install-completion.sh` wires it) |
 
 **Nothing changes without `--apply`.** `create`, `phrases`, `retarget`, `enable`, `disable`, `delete` and `forget`
-print what they would do and stop; add `--apply` to do it. `run` acts at once.
+print what they would do and stop; add `--apply` to do it. `run` and `discover` act at once.
 
 ## Output for scripts
 

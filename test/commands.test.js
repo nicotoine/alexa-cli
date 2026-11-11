@@ -124,6 +124,34 @@ describe('acting', () => {
         assert.equal(r.code, 0);
         assert.deepEqual(written(client, 'run'), [['run', 'ECHO1', 'amzn1.alexa.automation.pause']]);
     });
+
+    it('starts a discovery and stops once the new devices have settled', async () => {
+        const lamp = { applianceId: 'AAA_SonarCloudService_lamp', friendlyName: 'Lampe du bureau', manufacturerName: 'riddix' };
+        const client = fakeClient({ appliances: structuredClone(APPLIANCES), arrivals: [[], [lamp], [], [], []] });
+        const r = await cli(['discover', '--json'], client);
+        assert.equal(r.code, 0, r.stdout);
+        assert.deepEqual(r.json().found.map((d) => d.name), ['Lampe du bureau']);
+        assert.equal(written(client, 'discover').length, 1);
+        assert.equal(written(client, 'pause').length, 3);
+    });
+
+    it('watches for the whole --wait when nothing new appears', async () => {
+        const client = fakeClient({ appliances: structuredClone(APPLIANCES) });
+        const r = await cli(['discover', '--wait', '30'], client);
+        assert.equal(r.code, 0);
+        assert.match(r.stdout, /no new device/);
+        assert.equal(written(client, 'pause').length, 3);
+    });
+
+    it('only asks with --wait 0, and refuses a wait that is not a number', async () => {
+        const client = fakeClient({ appliances: structuredClone(APPLIANCES) });
+        const r = await cli(['discover', '--wait', '0', '--json'], client);
+        assert.equal(r.json().message, 'discovery started');
+        assert.deepEqual(written(client, 'pause'), []);
+        const bad = await cli(['discover', '--wait', 'soon', '--json'], fakeClient());
+        assert.equal(bad.code, 1);
+        assert.deepEqual(written(client, 'discover').length, 1);
+    });
 });
 
 describe('specs', () => {

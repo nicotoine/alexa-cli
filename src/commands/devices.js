@@ -69,4 +69,44 @@ const forget = {
     },
 };
 
-export default [devices, appliances, forget];
+const POLL_MS = 10000;
+const DEFAULT_WAIT_S = 90;
+
+const describeAppliance = (a) => ({
+    name: deviceName(a),
+    maker: a.manufacturerName || '',
+    source: applianceSource(a),
+    applianceId: a.applianceId,
+});
+
+// Acts at once, like run: it only asks Alexa to look, as saying "discover devices" to an Echo would.
+const discover = {
+    name: 'discover',
+    group: 'Smart home',
+    summary: 'Ask Alexa to look for new devices, and say which ones appeared',
+    description: 'Alexa searches for about 45 s. The command polls the device list every 10 s and stops once new '
+        + 'devices have appeared and the next poll adds none, or when --wait runs out (0: ask and return at once).',
+    options: [{ name: 'wait', type: 'string', metavar: 'SECONDS', help: `How long to watch for new devices (default ${DEFAULT_WAIT_S})` }],
+    modes: ['json'],
+    async run(ctx, { opts }) {
+        const wait = opts.wait === undefined ? DEFAULT_WAIT_S : Number(opts.wait);
+        if (!Number.isInteger(wait) || wait < 0) throw new Error(`--wait expects a whole number of seconds, got "${opts.wait}"`);
+        const client = await ctx.client();
+        const known = new Set((await client.appliances()).map((a) => a.applianceId));
+        await client.startDiscovery();
+        let found = [];
+        for (let elapsed = POLL_MS; elapsed <= wait * 1000; elapsed += POLL_MS) {
+            await client.pause(POLL_MS);
+            const now = (await client.appliances()).filter((a) => !known.has(a.applianceId));
+            const settled = found.length > 0 && now.length === found.length;
+            found = now;
+            ctx.out.note(`${elapsed / 1000} s: ${found.length ? found.map(deviceName).join(', ') : 'nothing new yet'}`);
+            if (settled) break;
+        }
+        const message = wait === 0 ? 'discovery started'
+            : found.length ? `${found.length} new device(s): ${found.map(deviceName).join(', ')}` : 'no new device';
+        ctx.out.action({ applied: true, plan: 'discover devices', message, found: found.map(describeAppliance) });
+    },
+};
+
+export default [devices, appliances, discover, forget];

@@ -144,6 +144,16 @@ export class AlexaClient {
         return this.request(`/api/phoenix/appliance/${encodeURIComponent(applianceId)}`, { method: 'DELETE' });
     }
 
+    // What "Alexa, discover devices" does. Amazon answers {} at once and searches on its own for about 45 s: a
+    // device the Matter Hub bridge had just added showed up 50 s after the POST, in appliances only.
+    startDiscovery() {
+        return this.request('/api/phoenix/discovery', { method: 'POST' });
+    }
+
+    pause(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     runRoutine(echoSerial, routine) {
         return this.callback((cb) => this.remote.executeAutomationRoutine(echoSerial, routine, cb));
     }
