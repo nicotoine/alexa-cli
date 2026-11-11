@@ -31,7 +31,11 @@
         <div class="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
             <div class="flex min-w-0 flex-1 items-baseline gap-2">
                 <h1 class="text-lg font-semibold tracking-tight">Alexa</h1>
-                {#if app.build}<span class="hidden truncate text-xs text-muted-foreground md:inline">{app.build.label}</span>{/if}
+                <!-- The short version on a phone too: it is how one sees that an update went through. -->
+                {#if app.build}
+                    <span class="truncate text-xs text-muted-foreground md:hidden">v{app.build.version}</span>
+                    <span class="hidden truncate text-xs text-muted-foreground md:inline">{app.build.label}</span>
+                {/if}
             </div>
             <Badge variant="outline" class="max-w-[46vw] gap-1.5 truncate font-normal" aria-live="polite">
                 {#if busy}

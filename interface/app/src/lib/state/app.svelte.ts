@@ -33,7 +33,7 @@ class App {
     syncState = $state<Sync>({ state: 'loading', text: 'Chargement…' });
     needsLogin = $state(false);
     prefs = $state(loadPrefs());
-    build = $state<{ label: string; build: number | null } | null>(null);
+    build = $state<{ label: string; version: string; build: number | null } | null>(null);
     // A newer APK than this one, offered once per version (see dismissUpdate).
     update = $state<{ current: string; latest: string; url: string; selfInstall: boolean } | null>(null);
     // The download and install under way in the app (see installUpdate), null when nothing is.
@@ -112,7 +112,7 @@ class App {
             this.checkUpdate();
         });
         window.addEventListener('online', () => this.refresher.wake());
-        fetchVersion().then((b: { label: string; build: number | null }) => { this.build = b; }, () => {});
+        fetchVersion().then((b: { label: string; version: string; build: number | null }) => { this.build = b; }, () => {});
         this.checkUpdate();
         window.addEventListener('beforeunload', (e) => { if (this.store.saving()) e.preventDefault(); });
     }
