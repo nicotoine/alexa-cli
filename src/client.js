@@ -10,6 +10,33 @@ const ROUTINES_VERSION = '3.0.264101';
 const WRITE_HEADERS = { 'Content-Type': 'application/json', 'Routines-Version': ROUTINES_VERSION };
 const TIMEOUT_MS = 30000;
 
+// A device's state and its control go through the app's GraphQL endpoint: the older /api/phoenix/state answers
+// ENDPOINT_UNREACHABLE for a Matter device that is reachable (seen on the Matter Hub bridge). Each property's
+// value comes in a field of its own type, so only the types asked for here come back with a value.
+const ENDPOINT_STATE = `query endpointState($endpointId: String!) {
+  endpoint(id: $endpointId) {
+    id
+    features {
+      name
+      instance
+      properties {
+        name
+        ... on Reachability { reachabilityStatusValue }
+        ... on Power { powerStateValue }
+        ... on Brightness { brightnessStateValue }
+        ... on ToggleState { toggleStateValue }
+      }
+    }
+  }
+}`;
+// Found by introspection: the mutation named in older clients (updatePowerFeatureForEndpoints) no longer exists.
+const SET_FEATURES = `mutation setEndpointFeatures($input: SetEndpointFeaturesInput!) {
+  setEndpointFeatures(setEndpointFeaturesInput: $input) {
+    featureControlResponses { endpointId featureOperationName }
+    errors { endpointId code }
+  }
+}`;
+
 export class NotLoggedIn extends Error {
     constructor() {
         super('not logged in: run "alexa-cli login" first');
@@ -148,6 +175,25 @@ export class AlexaClient {
     // device the Matter Hub bridge had just added showed up 50 s after the POST, in appliances only.
     startDiscovery() {
         return this.request('/api/phoenix/discovery', { method: 'POST' });
+    }
+
+    async graphql(query, variables) {
+        const res = await this.request('/nexus/v1/graphql', { method: 'POST', headers: { 'Content-Type': 'application/json' }, data: asciiJson({ query, variables }) });
+        if (res && Array.isArray(res.errors) && res.errors.length) throw new Error(`Alexa refused the request: ${res.errors[0].message}`);
+        return (res && res.data) || {};
+    }
+
+    /** The device as it is now: its features and their properties (see deviceState in model.js). */
+    async endpointState(endpointId) {
+        const data = await this.graphql(ENDPOINT_STATE, { endpointId });
+        if (!data.endpoint) throw new Error('Alexa did not answer for this device');
+        return data.endpoint;
+    }
+
+    async setFeature(endpointId, featureName, operation) {
+        const data = await this.graphql(SET_FEATURES, { input: { featureControlRequests: [{ endpointId, featureName, featureOperationName: operation }] } });
+        const errors = (data.setEndpointFeatures && data.setEndpointFeatures.errors) || [];
+        if (errors.length) throw new Error(`the device refused ${operation}: ${errors.map((e) => e.code).join(', ')}`);
     }
 
     pause(ms) {

@@ -67,7 +67,23 @@ export function routines() {
 }
 
 /** A stand-in for AlexaClient that records what was written. */
-export function fakeClient({ routineList = routines(), entities = ENTITIES, appliances = APPLIANCES, arrivals = [] } = {}) {
+// A Matter light as the appliance list shows it: its features say what it accepts.
+export const LAMP = {
+    applianceId: 'AAA_SonarCloudService_lamp', entityId: 'lamp-entity', endpointId: 'amzn1.alexa.endpoint.lamp',
+    friendlyName: 'Lampe du bureau', manufacturerName: 'IKEA', applianceTypes: ['LIGHT'],
+    features: [{ name: 'connectivity', operations: null }, { name: 'power', operations: [{ name: 'turnOn' }, { name: 'turnOff' }] }],
+};
+
+/** The GraphQL endpoint of a device, as endpointState answers it. */
+export const endpointOf = (endpointId, power) => ({
+    id: endpointId,
+    features: [
+        { name: 'connectivity', instance: null, properties: [{ name: 'reachability', reachabilityStatusValue: 'OK' }] },
+        { name: 'power', instance: null, properties: [{ name: 'powerState', powerStateValue: power }] },
+    ],
+});
+
+export function fakeClient({ routineList = routines(), entities = ENTITIES, appliances = APPLIANCES, arrivals = [], powers = {} } = {}) {
     const calls = [];
     let discovering = false;
     return {
@@ -98,6 +114,12 @@ export function fakeClient({ routineList = routines(), entities = ENTITIES, appl
             calls.push(['discover']);
             discovering = true;
             return {};
+        },
+        // `powers`: endpointId → 'ON' | 'OFF'; setFeature switches it, as the device would.
+        endpointState: async (endpointId) => endpointOf(endpointId, powers[endpointId] || 'OFF'),
+        setFeature: async (endpointId, feature, operation) => {
+            calls.push(['control', endpointId, feature, operation]);
+            powers[endpointId] = operation === 'turnOn' ? 'ON' : 'OFF';
         },
         pause: async (ms) => {
             calls.push(['pause', ms]);

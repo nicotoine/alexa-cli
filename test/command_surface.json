@@ -11,6 +11,11 @@
   "alexa-cli completion": [
     "<shell>!"
   ],
+  "alexa-cli control": [
+    "--json MODE",
+    "--op CHOICE(turnOn|turnOff)",
+    "<device>!"
+  ],
   "alexa-cli create": [
     "--apply FLAG",
     "--device STRING",
@@ -91,6 +96,10 @@
     "<text>"
   ],
   "alexa-cli snapshot": [],
+  "alexa-cli state": [
+    "--json MODE",
+    "<device>!"
+  ],
   "alexa-cli status": [
     "--json MODE"
   ],

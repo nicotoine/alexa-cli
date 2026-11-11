@@ -103,6 +103,49 @@ export function applianceSource(a) {
     return { AAA: 'matter', SKILL: 'skill' }[prefix] || prefix.toLowerCase();
 }
 
+// ---- device state -----------------------------------------------------------------------------------------
+
+/**
+ * What a device is doing now, from the GraphQL endpoint (client.endpointState): one entry per feature, with the
+ * value of each property and the operations the device lists for it (from the appliance). A property's value is
+ * in a field named after its type ("powerStateValue", "reachabilityStatusValue"…), null when the query did not
+ * ask for that type.
+ */
+export function deviceState(appliance, endpoint) {
+    const operations = new Map((appliance.features || []).map((f) => [f.name, (f.operations || []).map((o) => o.name)]));
+    const features = ((endpoint && endpoint.features) || []).map((f) => ({
+        name: f.name,
+        instance: f.instance || null,
+        operations: operations.get(f.name) || [],
+        properties: Object.fromEntries((f.properties || []).map((p) => {
+            const key = Object.keys(p).find((k) => k.endsWith('Value') && p[k] !== null && p[k] !== undefined);
+            return [p.name, key ? p[key] : null];
+        })),
+    }));
+    const value = (feature, property) => {
+        const f = features.find((x) => x.name === feature);
+        return f && property in f.properties ? f.properties[property] : null;
+    };
+    return {
+        name: deviceName(appliance),
+        applianceId: appliance.applianceId,
+        endpointId: appliance.endpointId || null,
+        types: appliance.applianceTypes || [],
+        maker: appliance.manufacturerName || '',
+        source: applianceSource(appliance),
+        reachable: value('connectivity', 'reachability') === 'OK',
+        power: value('power', 'powerState'),
+        brightness: value('brightness', 'brightness'),
+        features,
+    };
+}
+
+/** The power operations a device accepts, from the appliance list (no network). */
+export function powerOperations(appliance) {
+    const power = (appliance.features || []).find((f) => f.name === 'power');
+    return power ? (power.operations || []).map((o) => o.name).filter((n) => OPERATIONS.includes(n)) : [];
+}
+
 // ---- skills -----------------------------------------------------------------------------------------------
 
 // The skill behind a skill-provided appliance: driverIdentity.identifier is base64 JSON {"skillId", "stage"}.

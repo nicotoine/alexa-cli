@@ -1,8 +1,11 @@
-// Smart-home devices: the ones routines can target, the full list with sources, and deleting one.
+// Smart-home devices: the ones routines can target, the full list with sources, what one is doing and acting on
+// it, looking for new ones, and deleting one.
 
 import { APPLY } from '../args.js';
 import { act } from '../context.js';
-import { applianceSource, deviceIds, deviceName, findByName, routineLabel, routineTargets } from '../model.js';
+import {
+    applianceSource, deviceIds, deviceName, deviceState, findByName, OPERATIONS, powerOperations, routineLabel, routineTargets,
+} from '../model.js';
 
 const matches = (text) => (d) => !text || deviceName(d).toLowerCase().includes(text.toLowerCase());
 
@@ -109,4 +112,56 @@ const discover = {
     },
 };
 
-export default [devices, appliances, discover, forget];
+const DEVICE = { name: 'device', required: true, help: 'Device name or id' };
+
+function renderState(out, s) {
+    const on = s.power === 'ON' ? out.style.green('on') : s.power === 'OFF' ? 'off' : '—';
+    out.line(`${out.style.bold(s.name)}  ${s.maker} · ${s.source} · ${s.types.join(', ')}`);
+    out.line(`reachable  ${s.reachable ? out.style.green('yes') : out.style.red('no')}`);
+    out.line(`power      ${on}${s.brightness !== null ? ` · brightness ${s.brightness}` : ''}`);
+    for (const f of s.features) {
+        const values = Object.entries(f.properties).map(([k, v]) => `${k}=${v ?? '?'}`).join(' ');
+        out.line(out.style.dim(`  ${f.name}${f.instance ? `.${f.instance}` : ''}  ${values}${f.operations.length ? `  [${f.operations.join(', ')}]` : ''}`));
+    }
+}
+
+async function applianceAndClient(ctx, key) {
+    const client = await ctx.client();
+    const appliance = findByName(await client.appliances(), key);
+    if (!appliance.endpointId) throw new Error(`"${deviceName(appliance)}" has no endpoint id: Alexa cannot report or control it here`);
+    return { client, appliance };
+}
+
+const state = {
+    name: 'state',
+    group: 'Smart home',
+    summary: 'What a device is doing now: reachable, on or off, and every feature it reports',
+    args: [DEVICE],
+    modes: ['json'],
+    async run(ctx, { args }) {
+        const { client, appliance } = await applianceAndClient(ctx, args.device);
+        ctx.out.document(deviceState(appliance, await client.endpointState(appliance.endpointId)), (s) => renderState(ctx.out, s));
+    },
+};
+
+// Acts at once, like run: switching a light is what saying it to an Echo does, and there is nothing to preview.
+const control = {
+    name: 'control',
+    group: 'Smart home',
+    summary: 'Turn a device on or off, then read its state back',
+    args: [DEVICE],
+    options: [{ name: 'op', type: 'choice', choices: OPERATIONS, help: 'turnOn or turnOff' }],
+    modes: ['json'],
+    async run(ctx, { args, opts }) {
+        if (!opts.op) throw new Error('--op is required: turnOn or turnOff');
+        const { client, appliance } = await applianceAndClient(ctx, args.device);
+        if (!powerOperations(appliance).includes(opts.op)) {
+            throw new Error(`"${deviceName(appliance)}" cannot ${opts.op}: it lists ${powerOperations(appliance).join(', ') || 'no power operation'}`);
+        }
+        await client.setFeature(appliance.endpointId, 'power', opts.op);
+        const after = deviceState(appliance, await client.endpointState(appliance.endpointId));
+        ctx.out.action({ applied: true, plan: `${opts.op} "${deviceName(appliance)}"`, message: `power ${after.power || 'unknown'}`, state: after });
+    },
+};
+
+export default [devices, appliances, state, control, discover, forget];

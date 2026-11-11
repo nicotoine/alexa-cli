@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { NotLoggedIn } from '../src/client.js';
-import { APPLIANCES, fakeClient } from './fixtures.js';
+import { APPLIANCES, fakeClient, LAMP } from './fixtures.js';
 import { cli } from './helpers.js';
 
 const written = (client, kind) => client.calls.filter((c) => c[0] === kind);
@@ -123,6 +123,36 @@ describe('acting', () => {
         const r = await cli(['run', 'pause télé'], client);
         assert.equal(r.code, 0);
         assert.deepEqual(written(client, 'run'), [['run', 'ECHO1', 'amzn1.alexa.automation.pause']]);
+    });
+
+    it('reports what a device is doing: reachable, on or off, with its operations', async () => {
+        const client = fakeClient({ appliances: [LAMP], powers: { [LAMP.endpointId]: 'ON' } });
+        const r = await cli(['state', 'lampe du bureau', '--json'], client);
+        assert.equal(r.code, 0, r.stdout);
+        const s = r.json();
+        assert.deepEqual([s.name, s.reachable, s.power, s.types], ['Lampe du bureau', true, 'ON', ['LIGHT']]);
+        assert.deepEqual(s.features.find((f) => f.name === 'power').operations, ['turnOn', 'turnOff']);
+        const human = await cli(['state', 'Lampe du bureau'], client);
+        assert.match(human.stdout, /power\s+on/);
+    });
+
+    it('turns a device on at once, and reads its state back', async () => {
+        const client = fakeClient({ appliances: [LAMP] });
+        const r = await cli(['control', 'Lampe du bureau', '--op', 'turnOn', '--json'], client);
+        assert.equal(r.code, 0, r.stdout);
+        assert.deepEqual(written(client, 'control'), [['control', LAMP.endpointId, 'power', 'turnOn']]);
+        assert.equal(r.json().state.power, 'ON');
+    });
+
+    it('refuses an operation the device does not list, and a missing --op, before sending anything', async () => {
+        const noPower = { ...LAMP, features: [{ name: 'connectivity', operations: null }] };
+        const client = fakeClient({ appliances: [noPower] });
+        const refused = await cli(['control', 'Lampe du bureau', '--op', 'turnOn', '--json'], client);
+        assert.equal(refused.code, 1);
+        assert.match(refused.json().error, /cannot turnOn/);
+        const missing = await cli(['control', 'Lampe du bureau', '--json'], client);
+        assert.match(missing.json().error, /--op is required/);
+        assert.deepEqual(written(client, 'control'), []);
     });
 
     it('starts a discovery and stops once the new devices have settled', async () => {

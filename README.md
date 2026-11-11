@@ -139,6 +139,8 @@ alexa-cli update "on va dormir" --from dormir.json --apply
 | `devices [text]` | devices a routine can target |
 | `appliances [text]` | every device with its source (`matter`, `skill`), maker and reachability |
 | `skills [text]` | enabled skills and the devices each one provides |
+| `state <device>` | what a device is doing now: reachable, on or off, and every feature it reports |
+| `control <device> --op turnOn\|turnOff` | switch a device on or off, then read its state back |
 | `discover [--wait SECONDS]` | ask Alexa to look for new devices, as "Alexa, discover devices" does, and list the ones that appear |
 | `forget <device> [--force]` | delete a device; refused while a routine uses it |
 
@@ -160,7 +162,11 @@ still linked — unlink it in the Alexa app.
 | `completion bash\|zsh\|fish` | the completion script (`install-completion.sh` wires it) |
 
 **Nothing changes without `--apply`.** `create`, `phrases`, `retarget`, `enable`, `disable`, `delete` and `forget`
-print what they would do and stop; add `--apply` to do it. `run` and `discover` act at once.
+print what they would do and stop; add `--apply` to do it. `run`, `control` and `discover` act at once.
+
+`state` and `control` go through the Alexa app's GraphQL endpoint (`/nexus/v1/graphql`): the older
+`/api/phoenix/state` answers `ENDPOINT_UNREACHABLE` for Matter devices that are reachable. A device bridged from
+Home Assistant may not be what its type says: Matter Hub exposes a script as a plug, and `turnOn` runs the script.
 
 ## Output for scripts
 
