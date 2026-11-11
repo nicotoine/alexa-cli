@@ -16,7 +16,14 @@ export const WRITES = {
     run: { positional: true, options: ['on'], immediate: true },
     // Only asks Alexa to look; the answer lists what appeared.
     discover: { positional: false, options: ['wait'], immediate: true },
+    // Switching a device, like saying it to an Echo: at once.
+    control: { positional: true, options: ['op'], immediate: true },
 };
+
+/** CLI arguments to read one device's state (GET /api/state): a read, so nothing but the device is accepted. */
+export function stateArgv(device) {
+    return ['state', text(device, 'device'), '--json'];
+}
 
 const LISTS = new Set(['phrase', 'add', 'remove']);
 const FLAGS = new Set(['force']);

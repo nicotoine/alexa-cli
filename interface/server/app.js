@@ -7,6 +7,7 @@
 //   GET  /api/journal      the latest changes the interface applied, newest first
 //   GET  /api/version      which build this is (version, build number, commit)
 //   GET  /api/update       whether a newer APK is out, and where to download it (server/update.js)
+//   GET  /api/state?device= what one device is doing now (the CLI's state --json)
 //   POST /api/login       starts the Amazon login; answers the local page to sign in on
 //   GET  /…                the page (interface/public)
 
@@ -15,7 +16,7 @@ import path from 'node:path';
 import { versionInfo } from '../../src/version.js';
 import * as journal from './journal.js';
 import { createUpdateCheck } from './update.js';
-import { BadRequest, WRITES, writeArgv } from './writes.js';
+import { BadRequest, stateArgv, WRITES, writeArgv } from './writes.js';
 
 const TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -115,6 +116,18 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {}, 
         return send(res, result.ok ? 200 : 422, result.ok ? result.doc : { error: result.error });
     }
 
+    // A read: no custom header needed (a page elsewhere cannot read the answer without CORS, which is never sent).
+    async function deviceState(res, device) {
+        let argv;
+        try {
+            argv = stateArgv(device);
+        } catch (e) {
+            return send(res, 400, { error: e.message });
+        }
+        const result = await runner.run(argv);
+        return send(res, result.ok ? 200 : 422, result.ok ? result.doc : { error: result.error });
+    }
+
     function file(res, pathname) {
         const rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname.slice(1));
         const target = path.join(publicDir, path.normalize(rel));
@@ -135,6 +148,7 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {}, 
             if (req.method === 'GET' && pathname === '/api/version') return send(res, 200, versionInfo());
             // Offline or GitHub refusing is not an error worth showing: the page just offers no update.
             if (req.method === 'GET' && pathname === '/api/update') return send(res, 200, await checkUpdate().catch((e) => ({ checked: false, reason: e.message })));
+            if (req.method === 'GET' && pathname === '/api/state') return await deviceState(res, new URL(req.url, 'http://x').searchParams.get('device'));
             if (req.method === 'GET' && pathname === '/api/journal') return send(res, 200, journal.read({ ...journalOptions, limit: 100 }));
             if (req.method === 'POST' && pathname === '/api/login') return await login(req, res);
             if (req.method === 'POST' && pathname.startsWith('/api/do/')) return await change(req, res, pathname.slice('/api/do/'.length));

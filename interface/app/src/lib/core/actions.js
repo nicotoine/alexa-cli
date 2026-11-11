@@ -192,6 +192,24 @@ export function createActions({ store, change, activity, explain, resync = () =>
             }
         },
 
+        /**
+         * Switches a device on or off. Resolves to the state the device reports afterwards, or null when it refused
+         * (the queue then says why, with a retry).
+         */
+        async power(appliance, on) {
+            const op = on ? 'turnOn' : 'turnOff';
+            const id = activity.add({ label: `${on ? 'Allumer' : 'Éteindre'} « ${appliance.friendlyName} »`, state: 'running' });
+            try {
+                const doc = await change('control', { target: appliance.applianceId, op });
+                const now = doc.state && doc.state.power;
+                activity.update(id, { state: 'done', detail: now === 'ON' ? 'Allumé' : now === 'OFF' ? 'Éteint' : 'Envoyé' });
+                return doc.state || null;
+            } catch (e) {
+                activity.update(id, { state: 'failed', detail: explain(e.message), retry: () => { activity.dismiss(id); return actions.power(appliance, on); } });
+                return null;
+            }
+        },
+
         // Alexa searches for about 45 s and the CLI watches until the new devices settle: one search at a time.
         isDiscovering: () => discovering,
 

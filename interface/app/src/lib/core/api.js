@@ -33,6 +33,14 @@ export async function update(fetchFn = fetch) {
     return res.json();
 }
 
+/** What one device is doing now: { name, reachable, power, features, … } (the CLI's state --json). */
+export async function deviceState(applianceId, fetchFn = fetch) {
+    const res = await fetchFn(`/api/state?device=${encodeURIComponent(applianceId)}`);
+    const doc = await res.json().catch(() => ({ error: res.statusText }));
+    if (!res.ok) throw new Error(doc.error || `HTTP ${res.status}`);
+    return doc;
+}
+
 /** The latest changes the interface applied (server journal), newest first. */
 export async function journal(fetchFn = fetch) {
     const res = await fetchFn('/api/journal');

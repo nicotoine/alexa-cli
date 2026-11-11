@@ -1,8 +1,9 @@
 <script lang="ts">
     // The Devices tab: a table sorted by its column headers on a wide screen, a list with a sort menu on a phone; the
-    // same filters for both.
+    // same filters for both. A device's name opens its panel (state, on/off).
     import { ArrowDown, ArrowUp, ArrowUpDown, LoaderCircle, Radar, Search, Trash2 } from '@lucide/svelte';
     import Choice from '$lib/components/Choice.svelte';
+    import DeviceSheet from '$lib/components/DeviceSheet.svelte';
     import { Badge } from '$lib/components/ui/badge/index.js';
     import { Button } from '$lib/components/ui/button/index.js';
     import * as InputGroup from '$lib/components/ui/input-group/index.js';
@@ -20,6 +21,10 @@
     const count = $derived(view.appliances
         ? (rows.length === view.appliances.length ? `${rows.length} appareils` : `${rows.length} sur ${view.appliances.length}`) : '');
     const sortOf = (column: string) => (criteria.sort !== column ? 'none' : criteria.dir === 'desc' ? 'descending' : 'ascending');
+
+    // The row whose panel is open, by id: the row itself is rebuilt on every refresh of the list.
+    let openId = $state<string | null>(null);
+    const opened = $derived(openId ? rows.find((r: { a: { applianceId: string } }) => r.a.applianceId === openId) ?? null : null);
 </script>
 
 {#snippet source(s: string)}
@@ -84,7 +89,9 @@
                 <Table.Body>
                     {#each rows as { a, source: s, refs } (a.applianceId)}
                         <Table.Row class={app.isPending(a.applianceId) ? 'opacity-50' : ''}>
-                            <Table.Cell class="font-medium">{a.friendlyName}</Table.Cell>
+                            <Table.Cell class="font-medium">
+                                <button type="button" class="text-left hover:underline" onclick={() => (openId = a.applianceId)}>{a.friendlyName}</button>
+                            </Table.Cell>
                             <Table.Cell>{a.manufacturerName || ''}</Table.Cell>
                             <Table.Cell>{@render source(s)}</Table.Cell>
                             <Table.Cell class="max-w-xs text-xs whitespace-normal text-muted-foreground">{refs.length ? refs.join(', ') : '—'}</Table.Cell>
@@ -101,11 +108,11 @@
         <ul class="divide-y rounded-lg border">
             {#each rows as { a, source: s, refs } (a.applianceId)}
                 <li class="flex items-center gap-3 px-3 py-2.5 {app.isPending(a.applianceId) ? 'opacity-50' : ''}">
-                    <div class="min-w-0 flex-1">
+                    <button type="button" class="min-w-0 flex-1 text-left" onclick={() => (openId = a.applianceId)}>
                         <p class="font-medium">{a.friendlyName}</p>
                         <p class="flex items-center gap-1.5 text-sm text-muted-foreground">{a.manufacturerName || ''} {@render source(s)}</p>
                         {#if refs.length}<p class="text-xs text-muted-foreground">{refs.join(', ')}</p>{/if}
-                    </div>
+                    </button>
                     <Button variant="ghost" size="icon" class="text-destructive hover:text-destructive" aria-label="Supprimer {a.friendlyName}"
                         onclick={() => app.actions.forget(a)}><Trash2 /></Button>
                 </li>
@@ -116,3 +123,5 @@
         <p class="py-6 text-center text-sm text-muted-foreground">Aucun appareil ne correspond aux filtres.</p>
     {/if}
 </div>
+
+<DeviceSheet appliance={opened?.a ?? null} source={opened?.source ?? ''} refs={opened?.refs ?? []} onClose={() => (openId = null)} />
