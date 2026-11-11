@@ -4,11 +4,16 @@
 
 import { createActions } from '$lib/core/actions.js';
 import { createActivity } from '$lib/core/activity.js';
-import { change, login, session, snapshot, update as fetchUpdate, version as fetchVersion } from '$lib/core/api.js';
+import {
+    change, login, session, snapshot, startUpdateDownload, update as fetchUpdate, updateDownloadProgress, version as fetchVersion,
+} from '$lib/core/api.js';
 import { explain } from '$lib/core/explain.js';
+import { downloadAndInstall, nativeInstaller } from '$lib/core/installer.js';
 import { loadPrefs, savePrefs } from '$lib/core/prefs.js';
 import { createRefresher } from '$lib/core/refresh.js';
 import { createStore } from '$lib/core/store.js';
+
+type Progress = { state: string; received?: number; total?: number | null; error?: string };
 
 // The version the user said "later" to. Storage can be refused (private mode): then the offer simply comes back.
 const DISMISSED_KEY = 'alexa-cli:update-dismissed';
@@ -30,7 +35,9 @@ class App {
     prefs = $state(loadPrefs());
     build = $state<{ label: string } | null>(null);
     // A newer APK than this one, offered once per version (see dismissUpdate).
-    update = $state<{ current: string; latest: string; url: string } | null>(null);
+    update = $state<{ current: string; latest: string; url: string; selfInstall: boolean } | null>(null);
+    // The download and install under way in the app (see installUpdate), null when nothing is.
+    installing = $state<Progress | null>(null);
     // A quiet read under way: the badge shows a small loader, nothing else moves.
     refreshing = $state(false);
 
@@ -209,7 +216,11 @@ class App {
     private async checkUpdate() {
         try {
             const u = await fetchUpdate();
-            if (u.checked && u.newer && readDismissed() !== u.latest) this.update = { current: u.current, latest: u.latest, url: u.url };
+            if (u.checked && u.newer && readDismissed() !== u.latest) {
+                // Installing from the app needs both the server's downloader and MainActivity's installer.
+                const selfInstall = Boolean(u.selfInstall && nativeInstaller());
+                this.update = { current: u.current, latest: u.latest, url: u.url, selfInstall };
+            }
         } catch {
             // Offline or GitHub unreachable: nothing to offer, nothing to say.
         }
@@ -217,8 +228,28 @@ class App {
 
     /** "Plus tard": not offered again until a newer version than this one is out. */
     dismissUpdate() {
+        if (this.installing?.state === 'downloading') return;
         if (this.update) writeDismissed(this.update.latest);
         this.update = null;
+        this.installing = null;
+    }
+
+    /** Downloads the APK in the app and opens Android's installer; `installing` follows it for the dialog. */
+    async installUpdate() {
+        const installer = nativeInstaller();
+        if (!installer) return;
+        this.installing = { state: 'downloading', received: 0, total: null };
+        try {
+            const outcome = await downloadAndInstall({
+                installer,
+                start: startUpdateDownload,
+                progress: updateDownloadProgress,
+                onProgress: (p: Progress) => { this.installing = p; },
+            });
+            this.installing = { state: outcome };
+        } catch (e) {
+            this.installing = { state: 'error', error: explain((e as Error).message) };
+        }
     }
 
     // ---- sort and filter choices

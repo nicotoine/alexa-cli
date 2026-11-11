@@ -94,7 +94,7 @@ describe('the server', () => {
         failing = true;
         const r = await request('/api/update');
         assert.equal(r.status, 200);
-        assert.deepEqual(r.json(), { checked: false, reason: 'offline' });
+        assert.deepEqual(r.json(), { checked: false, reason: 'offline', selfInstall: false });
         failing = false;
     });
 

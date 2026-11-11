@@ -7,6 +7,8 @@
 //   GET  /api/journal      the latest changes the interface applied, newest first
 //   GET  /api/version      which build this is (version, build number, commit)
 //   GET  /api/update       whether a newer APK is out, and where to download it (server/update.js)
+//   POST /api/update/download  in the app: download the newer APK for MainActivity to install; answers the progress
+//   GET  /api/update/download  where that download is
 //   GET  /api/state?device= what one device is doing now (the CLI's state --json)
 //   POST /api/login       starts the Amazon login; answers the local page to sign in on
 //   GET  /…                the page (interface/public)
@@ -15,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { versionInfo } from '../../src/version.js';
 import * as journal from './journal.js';
-import { createUpdateCheck } from './update.js';
+import { createDownloader, createUpdateCheck } from './update.js';
 import { BadRequest, stateArgv, WRITES, writeArgv } from './writes.js';
 
 const TYPES = {
@@ -34,7 +36,10 @@ const SECURITY_HEADERS = {
     'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'",
 };
 
-export function createApp({ runner, publicDir, host, port, journalOptions = {}, checkUpdate = createUpdateCheck() }) {
+// The app (mobile/src/main.cjs) says where it may keep a downloaded APK; anywhere else there is nothing to install it.
+const defaultDownloader = () => (process.env.ALEXA_CLI_UPDATE_DIR ? createDownloader({ dir: process.env.ALEXA_CLI_UPDATE_DIR }) : null);
+
+export function createApp({ runner, publicDir, host, port, journalOptions = {}, checkUpdate = createUpdateCheck(), downloader = defaultDownloader() }) {
     // Last line received for each part of the snapshot, sent first so a new page renders at once.
     const cache = new Map();
 
@@ -116,6 +121,17 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {}, 
         return send(res, result.ok ? 200 : 422, result.ok ? result.doc : { error: result.error });
     }
 
+    // The version downloaded is the one the update check found, never one the page names.
+    async function download(req, res) {
+        if (!downloader) return send(res, 404, { error: 'no installer here' });
+        if (req.method === 'GET') return send(res, 200, downloader.progress());
+        if (req.method !== 'POST') return send(res, 405, { error: 'not found' });
+        if (!trusted(req)) return send(res, 403, { error: 'forbidden' });
+        const u = await checkUpdate().catch((e) => ({ checked: false, reason: e.message }));
+        if (!u.checked || !u.newer) return send(res, 409, { error: u.reason || 'no newer version' });
+        return send(res, 202, downloader.start(u.latest));
+    }
+
     // A read: no custom header needed (a page elsewhere cannot read the answer without CORS, which is never sent).
     async function deviceState(res, device) {
         let argv;
@@ -147,7 +163,11 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {}, 
             if (req.method === 'GET' && pathname === '/api/session') return send(res, 200, await runner.session());
             if (req.method === 'GET' && pathname === '/api/version') return send(res, 200, versionInfo());
             // Offline or GitHub refusing is not an error worth showing: the page just offers no update.
-            if (req.method === 'GET' && pathname === '/api/update') return send(res, 200, await checkUpdate().catch((e) => ({ checked: false, reason: e.message })));
+            if (req.method === 'GET' && pathname === '/api/update') {
+                const answer = await checkUpdate().catch((e) => ({ checked: false, reason: e.message }));
+                return send(res, 200, { ...answer, selfInstall: Boolean(downloader) });
+            }
+            if (pathname === '/api/update/download') return await download(req, res);
             if (req.method === 'GET' && pathname === '/api/state') return await deviceState(res, new URL(req.url, 'http://x').searchParams.get('device'));
             if (req.method === 'GET' && pathname === '/api/journal') return send(res, 200, journal.read({ ...journalOptions, limit: 100 }));
             if (req.method === 'POST' && pathname === '/api/login') return await login(req, res);

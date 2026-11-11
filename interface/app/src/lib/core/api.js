@@ -33,6 +33,21 @@ export async function update(fetchFn = fetch) {
     return res.json();
 }
 
+/** In the app: starts downloading the newer APK (the server picks the version); resolves to the progress. */
+export async function startUpdateDownload(fetchFn = fetch) {
+    const res = await fetchFn('/api/update/download', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Alexa-Cli': '1' }, body: '{}' });
+    const doc = await res.json().catch(() => ({ error: res.statusText }));
+    if (!res.ok) throw new Error(doc.error || `HTTP ${res.status}`);
+    return doc;
+}
+
+/** Where that download is: { state: idle|downloading|verifying|ready|error, received, total, error }. */
+export async function updateDownloadProgress(fetchFn = fetch) {
+    const res = await fetchFn('/api/update/download');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
 /** What one device is doing now: { name, reachable, power, features, … } (the CLI's state --json). */
 export async function deviceState(applianceId, fetchFn = fetch) {
     const res = await fetchFn(`/api/state?device=${encodeURIComponent(applianceId)}`);

@@ -231,8 +231,16 @@ first launch, **Se connecter à Amazon** opens Amazon's own sign-in page inside 
 routines load. Each new version installs over the previous one.
 
 **Updates.** At launch the app asks GitHub (at most once an hour) whether a newer release is out; if so, a dialog
-offers **Télécharger l'APK**, which opens the universal APK in the phone's browser. **Plus tard** hides it until a
+offers **Télécharger et installer**: the app downloads the APK built for the phone's processor (~55 MB), checks it
+against the release's `SHA256SUMS`, and opens Android's installer, which asks to confirm. The first time, Android
+also asks to allow installs from Alexa CLI (a setting it opens; come back and press **Installer** again). If that
+fails, **Par le navigateur** opens the universal APK in the phone's browser. **Plus tard** hides the offer until a
 version newer than that one comes out. A copy run from source never asks: it is updated with `git pull`.
+
+How the page reaches Android: it is served by the embedded server on `http://127.0.0.1:3457`, where Capacitor's
+bridge is not injected, so `MainActivity` registers a `WebMessageListener` (`alexaUpdater`) for that origin only. It
+installs nothing the page names: only the APK the server downloaded and checked, at a fixed path, shared through the
+`FileProvider` for that folder only.
 
 **Versions.** `<major>.<minor>` come from `package.json` (`npm version minor` starts a new series); the patch is the
 build number, the count of commits on `main`. Every push to `main` makes a GitHub release `v0.2.<build>`.

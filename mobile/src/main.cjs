@@ -10,6 +10,9 @@ const { getDataPath } = require('bridge');
 process.env.ALEXA_CLI_CONFIG_DIR = path.join(getDataPath(), 'alexa-cli');
 // No `node` binary to start on a phone: the server calls the CLI in this process, one Amazon connection kept open.
 process.env.ALEXA_CLI_RUNNER = 'inprocess';
+// Where the server downloads a newer APK. getDataPath() is <files>/nodejs/data: MainActivity installs from
+// <files>/nodejs/data/updates/alexa-cli-update.apk, and res/xml/file_paths.xml shares that folder only.
+process.env.ALEXA_CLI_UPDATE_DIR = path.join(getDataPath(), 'updates');
 
 import(pathToFileURL(path.join(__dirname, 'app', 'interface', 'server', 'index.js')).href)
     .then(({ start }) => start())
