@@ -4,6 +4,7 @@
     import ActivityBar from '$lib/components/ActivityBar.svelte';
     import LoginPanel from '$lib/components/LoginPanel.svelte';
     import RoutineEditor from '$lib/components/RoutineEditor.svelte';
+    import UpdateDialog from '$lib/components/UpdateDialog.svelte';
     import { Badge } from '$lib/components/ui/badge/index.js';
     import { Button } from '$lib/components/ui/button/index.js';
     import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -83,4 +84,5 @@
         onClose={() => (editing = null)}
         onSave={(spec, existing) => { app.actions.save(spec, existing); editing = null; }}
     />
+    <UpdateDialog />
 </div>

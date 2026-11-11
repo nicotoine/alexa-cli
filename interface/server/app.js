@@ -6,14 +6,16 @@
 //   GET  /api/session      whether a session is stored and accepted
 //   GET  /api/journal      the latest changes the interface applied, newest first
 //   GET  /api/version      which build this is (version, build number, commit)
-//   POST /api/login        starts the Amazon login; answers the local page to sign in on
+//   GET  /api/update       whether a newer APK is out, and where to download it (server/update.js)
+//   POST /api/login       starts the Amazon login; answers the local page to sign in on
 //   GET  /…                the page (interface/public)
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { versionInfo } from '../../src/version.js';
 import * as journal from './journal.js';
-import { BadRequest, writeArgv } from './writes.js';
+import { createUpdateCheck } from './update.js';
+import { BadRequest, WRITES, writeArgv } from './writes.js';
 
 const TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -31,7 +33,7 @@ const SECURITY_HEADERS = {
     'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-ancestors 'none'",
 };
 
-export function createApp({ runner, publicDir, host, port, journalOptions = {} }) {
+export function createApp({ runner, publicDir, host, port, journalOptions = {}, checkUpdate = createUpdateCheck() }) {
     // Last line received for each part of the snapshot, sent first so a new page renders at once.
     const cache = new Map();
 
@@ -99,7 +101,7 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {} }
             return send(res, 400, { error: e instanceof SyntaxError ? 'invalid JSON' : e.message });
         }
         const result = await runner.run(argv);
-        if (argv.includes('--apply') || command === 'run') {
+        if (argv.includes('--apply') || WRITES[command].immediate) {
             journal.record({
                 command,
                 target: argv[1] && !argv[1].startsWith('--') ? argv[1] : null,
@@ -131,6 +133,8 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {} }
             if (req.method === 'GET' && pathname === '/api/snapshot') return snapshot(req, res);
             if (req.method === 'GET' && pathname === '/api/session') return send(res, 200, await runner.session());
             if (req.method === 'GET' && pathname === '/api/version') return send(res, 200, versionInfo());
+            // Offline or GitHub refusing is not an error worth showing: the page just offers no update.
+            if (req.method === 'GET' && pathname === '/api/update') return send(res, 200, await checkUpdate().catch((e) => ({ checked: false, reason: e.message })));
             if (req.method === 'GET' && pathname === '/api/journal') return send(res, 200, journal.read({ ...journalOptions, limit: 100 }));
             if (req.method === 'POST' && pathname === '/api/login') return await login(req, res);
             if (req.method === 'POST' && pathname.startsWith('/api/do/')) return await change(req, res, pathname.slice('/api/do/'.length));

@@ -4,13 +4,18 @@
 
 import { createActions } from '$lib/core/actions.js';
 import { createActivity } from '$lib/core/activity.js';
-import { change, login, session, snapshot, version as fetchVersion } from '$lib/core/api.js';
+import { change, login, session, snapshot, update as fetchUpdate, version as fetchVersion } from '$lib/core/api.js';
 import { explain } from '$lib/core/explain.js';
 import { loadPrefs, savePrefs } from '$lib/core/prefs.js';
 import { createRefresher } from '$lib/core/refresh.js';
 import { createStore } from '$lib/core/store.js';
 
-const hhmm = (ms: number) => new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+// The version the user said "later" to. Storage can be refused (private mode): then the offer simply comes back.
+const DISMISSED_KEY = 'alexa-cli:update-dismissed';
+const readDismissed = () => { try { return localStorage.getItem(DISMISSED_KEY); } catch { return null; } };
+const writeDismissed = (v: string) => { try { localStorage.setItem(DISMISSED_KEY, v); } catch { /* not kept */ } };
+
+const hhmm =(ms: number) => new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 export const KINDS = ['routines', 'devices', 'appliances', 'echos', 'skills', 'audit'];
 const NEEDS_LOGIN = /not logged in|401|Unauthorized|Cookie invalid|alexa-cli login/i;
@@ -24,6 +29,8 @@ class App {
     needsLogin = $state(false);
     prefs = $state(loadPrefs());
     build = $state<{ label: string } | null>(null);
+    // A newer APK than this one, offered once per version (see dismissUpdate).
+    update = $state<{ current: string; latest: string; url: string } | null>(null);
     // A quiet read under way: the badge shows a small loader, nothing else moves.
     refreshing = $state(false);
 
@@ -78,6 +85,11 @@ class App {
         return saving ? { state: 'saving', text: `Enregistrement (${saving})…` } : this.syncState;
     }
 
+    get discovering() {
+        void this.version;
+        return this.actions.isDiscovering();
+    }
+
     isPending(key: string) {
         void this.version;
         return this.store.isPending(key);
@@ -90,6 +102,7 @@ class App {
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresher.wake(); });
         window.addEventListener('online', () => this.refresher.wake());
         fetchVersion().then((b: { label: string }) => { this.build = b; }, () => {});
+        this.checkUpdate();
         window.addEventListener('beforeunload', (e) => { if (this.store.saving()) e.preventDefault(); });
     }
 
@@ -189,6 +202,23 @@ class App {
             // Amazon's own page, through the proxy on this device; coming back, the session check notices.
             window.location.href = started.url;
         }
+    }
+
+    // ---- a newer APK
+
+    private async checkUpdate() {
+        try {
+            const u = await fetchUpdate();
+            if (u.checked && u.newer && readDismissed() !== u.latest) this.update = { current: u.current, latest: u.latest, url: u.url };
+        } catch {
+            // Offline or GitHub unreachable: nothing to offer, nothing to say.
+        }
+    }
+
+    /** "Plus tard": not offered again until a newer version than this one is out. */
+    dismissUpdate() {
+        if (this.update) writeDismissed(this.update.latest);
+        this.update = null;
     }
 
     // ---- sort and filter choices

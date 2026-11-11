@@ -1,7 +1,7 @@
 <script lang="ts">
     // The Devices tab: a table sorted by its column headers on a wide screen, a list with a sort menu on a phone; the
     // same filters for both.
-    import { ArrowDown, ArrowUp, ArrowUpDown, Search, Trash2 } from '@lucide/svelte';
+    import { ArrowDown, ArrowUp, ArrowUpDown, LoaderCircle, Radar, Search, Trash2 } from '@lucide/svelte';
     import Choice from '$lib/components/Choice.svelte';
     import { Badge } from '$lib/components/ui/badge/index.js';
     import { Button } from '$lib/components/ui/button/index.js';
@@ -27,11 +27,20 @@
 {/snippet}
 
 <div class="space-y-3">
-    <InputGroup.Root>
-        <InputGroup.Addon><Search /></InputGroup.Addon>
-        <InputGroup.Input value={criteria.text} placeholder="Filtrer les appareils" aria-label="Filtrer les appareils"
-            oninput={(e: Event) => set({ text: (e.currentTarget as HTMLInputElement).value })} />
-    </InputGroup.Root>
+    <div class="flex items-center gap-2">
+        <InputGroup.Root class="flex-1">
+            <InputGroup.Addon><Search /></InputGroup.Addon>
+            <InputGroup.Input value={criteria.text} placeholder="Filtrer les appareils" aria-label="Filtrer les appareils"
+                oninput={(e: Event) => set({ text: (e.currentTarget as HTMLInputElement).value })} />
+        </InputGroup.Root>
+        <!-- What "Alexa, discover devices" does: a device just added to a Matter bridge shows up after about 45 s. -->
+        <Button variant="outline" disabled={app.discovering} onclick={() => app.actions.discover()}
+            title="Demander à Alexa de chercher les nouveaux appareils">
+            {#if app.discovering}<LoaderCircle class="animate-spin" />{:else}<Radar />{/if}
+            <span class="hidden sm:inline">{app.discovering ? 'Recherche…' : 'Rechercher'}</span>
+            <span class="sr-only sm:hidden">Rechercher des appareils</span>
+        </Button>
+    </div>
 
     <div class="flex flex-wrap items-end gap-3">
         {#if !wide.current}

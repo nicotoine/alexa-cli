@@ -26,6 +26,13 @@ export async function version(fetchFn = fetch) {
     return res.json();
 }
 
+/** Whether a newer APK is out: { checked, current, latest, newer, url }; checked false on a copy run from source. */
+export async function update(fetchFn = fetch) {
+    const res = await fetchFn('/api/update');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
 /** The latest changes the interface applied (server journal), newest first. */
 export async function journal(fetchFn = fetch) {
     const res = await fetchFn('/api/journal');

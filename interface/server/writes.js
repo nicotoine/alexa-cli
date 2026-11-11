@@ -14,6 +14,8 @@ export const WRITES = {
     forget: { positional: true, options: ['force'] },
     // Runs at once: there is nothing to preview.
     run: { positional: true, options: ['on'], immediate: true },
+    // Only asks Alexa to look; the answer lists what appeared.
+    discover: { positional: false, options: ['wait'], immediate: true },
 };
 
 const LISTS = new Set(['phrase', 'add', 'remove']);

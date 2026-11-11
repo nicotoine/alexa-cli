@@ -224,6 +224,10 @@ installing from that source. It runs on any Android 7+ phone; the release also h
 first launch, **Se connecter à Amazon** opens Amazon's own sign-in page inside the app; once signed in, go back — the
 routines load. Each new version installs over the previous one.
 
+**Updates.** At launch the app asks GitHub (at most once an hour) whether a newer release is out; if so, a dialog
+offers **Télécharger l'APK**, which opens the universal APK in the phone's browser. **Plus tard** hides it until a
+version newer than that one comes out. A copy run from source never asks: it is updated with `git pull`.
+
 **Versions.** `<major>.<minor>` come from `package.json` (`npm version minor` starts a new series); the patch is the
 build number, the count of commits on `main`. Every push to `main` makes a GitHub release `v0.2.<build>`.
 

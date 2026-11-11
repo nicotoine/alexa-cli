@@ -9,6 +9,7 @@ const findRoutine = (view, id) => (view.routines || []).find((r) => r.automation
 
 export function createActions({ store, change, activity, explain, resync = () => {}, undoMs = 5000, schedule = setTimeout, unschedule = clearTimeout }) {
     let tempSeq = 0;
+    let discovering = false;
 
     /** Resolves once the change is answered, undone or refused. */
     function optimistic(spec) {
@@ -189,6 +190,31 @@ export function createActions({ store, change, activity, explain, resync = () =>
             } catch (e) {
                 activity.update(id, { state: 'failed', detail: explain(e.message), retry: () => { activity.dismiss(id); return actions.run(r); } });
             }
+        },
+
+        // Alexa searches for about 45 s and the CLI watches until the new devices settle: one search at a time.
+        isDiscovering: () => discovering,
+
+        async discover() {
+            if (discovering) return;
+            discovering = true;
+            const id = activity.add({ label: 'Rechercher des appareils', state: 'running' });
+            let doc;
+            let error = null;
+            try {
+                doc = await change('discover', {});
+            } catch (e) {
+                error = e;
+            }
+            // Cleared before the queue update, which is what makes the page draw again.
+            discovering = false;
+            if (error) {
+                activity.update(id, { state: 'failed', detail: explain(error.message), retry: () => { activity.dismiss(id); return actions.discover(); } });
+                return;
+            }
+            const names = (doc.found || []).map((d) => d.name);
+            activity.update(id, { state: 'done', detail: names.length ? `Nouveau : ${names.join(', ')}` : 'Aucun nouvel appareil' });
+            if (names.length) resync();
         },
     };
     return actions;
