@@ -17,8 +17,11 @@ import { versionInfo } from '../../src/version.js';
 export const REPO = 'nicotoine/alexa-cli';
 export const APK_URL = `https://github.com/${REPO}/releases/latest/download/alexa-cli-universal.apk`;
 const LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
-// GitHub allows 60 unauthenticated calls an hour per address: one an hour is plenty for a release a day.
-const CACHE_MS = 60 * 60 * 1000;
+// GitHub allows 60 unauthenticated calls an hour per address. On its own the app asks every 15 min at most (an hour
+// was too long: the app stays alive in the background, and a release just published went unseen). Asked from the
+// page's button it asks at once, but not more than every 30 s.
+const CACHE_MS = 15 * 60 * 1000;
+const FORCED_MIN_MS = 30 * 1000;
 const TIMEOUT_MS = 10000;
 
 const parts = (v) => String(v || '').replace(/^v/, '').split('.').map((n) => Number.parseInt(n, 10) || 0);
@@ -35,10 +38,11 @@ export function isNewer(a, b) {
 
 export function createUpdateCheck({ fetchFn = globalThis.fetch, current = versionInfo, now = Date.now } = {}) {
     let cached = null;
-    return async function check() {
+    return async function check({ force = false } = {}) {
         const mine = current();
         if (!mine.build) return { checked: false, current: mine.version, reason: 'not a built copy' };
-        if (cached && now() - cached.at < CACHE_MS) return { ...cached.answer, current: mine.version, newer: isNewer(cached.answer.latest, mine.version) };
+        const fresh = cached && now() - cached.at < (force ? FORCED_MIN_MS : CACHE_MS);
+        if (fresh) return { ...cached.answer, current: mine.version, newer: isNewer(cached.answer.latest, mine.version) };
         const res = await fetchFn(LATEST, {
             headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'alexa-cli' },
             signal: AbortSignal.timeout(TIMEOUT_MS),

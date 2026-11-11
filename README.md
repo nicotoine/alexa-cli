@@ -230,7 +230,8 @@ installing from that source. It runs on any Android 7+ phone; the release also h
 first launch, **Se connecter à Amazon** opens Amazon's own sign-in page inside the app; once signed in, go back — the
 routines load. Each new version installs over the previous one.
 
-**Updates.** At launch the app asks GitHub (at most once an hour) whether a newer release is out; if so, a dialog
+**Updates.** At launch and whenever it comes back to the front, the app asks GitHub (every 15 minutes at most)
+whether a newer release is out; the ⬆ button in the header asks at once. If one is out, a dialog
 offers **Télécharger et installer**: the app downloads the APK built for the phone's processor (~55 MB), checks it
 against the release's `SHA256SUMS`, and opens Android's installer, which asks to confirm. The first time, Android
 also asks to allow installs from Alexa CLI (a setting it opens; come back and press **Installer** again). If that

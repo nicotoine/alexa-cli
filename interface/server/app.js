@@ -164,7 +164,8 @@ export function createApp({ runner, publicDir, host, port, journalOptions = {}, 
             if (req.method === 'GET' && pathname === '/api/version') return send(res, 200, versionInfo());
             // Offline or GitHub refusing is not an error worth showing: the page just offers no update.
             if (req.method === 'GET' && pathname === '/api/update') {
-                const answer = await checkUpdate().catch((e) => ({ checked: false, reason: e.message }));
+                const force = new URL(req.url, 'http://x').searchParams.get('force') === '1';
+                const answer = await checkUpdate({ force }).catch((e) => ({ checked: false, reason: e.message }));
                 return send(res, 200, { ...answer, selfInstall: Boolean(downloader) });
             }
             if (pathname === '/api/update/download') return await download(req, res);

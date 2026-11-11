@@ -27,8 +27,8 @@ export async function version(fetchFn = fetch) {
 }
 
 /** Whether a newer APK is out: { checked, current, latest, newer, url }; checked false on a copy run from source. */
-export async function update(fetchFn = fetch) {
-    const res = await fetchFn('/api/update');
+export async function update({ force = false } = {}, fetchFn = fetch) {
+    const res = await fetchFn(force ? '/api/update?force=1' : '/api/update');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }

@@ -36,17 +36,20 @@ describe('the update check', () => {
         assert.deepEqual([u.checked, u.newer, u.latest, u.current, u.url], [true, true, '0.2.20', '0.2.18', APK_URL]);
     });
 
-    it('asks GitHub at most once an hour', async () => {
+    it('asks again after 15 min on its own, and at once when forced, but not twice within 30 s', async () => {
         const calls = [];
         let clock = 0;
         const check = createUpdateCheck({ fetchFn: github('v0.2.18', calls), current: built('0.2.18'), now: () => clock });
-        assert.equal((await check()).newer, false);
-        clock += 30 * 60 * 1000;
         await check();
+        clock += 10 * 1000;
+        await check({ force: true });
         assert.equal(calls.length, 1);
-        clock += 31 * 60 * 1000;
-        await check();
+        clock += 25 * 1000;
+        await check({ force: true });
         assert.equal(calls.length, 2);
+        clock += 16 * 60 * 1000;
+        await check();
+        assert.equal(calls.length, 3);
     });
 
     it('does not ask at all from a copy run from source', async () => {

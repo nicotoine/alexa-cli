@@ -33,7 +33,7 @@ class App {
     syncState = $state<Sync>({ state: 'loading', text: 'Chargement…' });
     needsLogin = $state(false);
     prefs = $state(loadPrefs());
-    build = $state<{ label: string } | null>(null);
+    build = $state<{ label: string; build: number | null } | null>(null);
     // A newer APK than this one, offered once per version (see dismissUpdate).
     update = $state<{ current: string; latest: string; url: string; selfInstall: boolean } | null>(null);
     // The download and install under way in the app (see installUpdate), null when nothing is.
@@ -106,9 +106,13 @@ class App {
         this.load();
         this.refresher.start();
         // Back on the page (another tab, the phone unlocked, the app resumed) or back online: read again if it is old.
-        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresher.wake(); });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible') return;
+            this.refresher.wake();
+            this.checkUpdate();
+        });
         window.addEventListener('online', () => this.refresher.wake());
-        fetchVersion().then((b: { label: string }) => { this.build = b; }, () => {});
+        fetchVersion().then((b: { label: string; build: number | null }) => { this.build = b; }, () => {});
         this.checkUpdate();
         window.addEventListener('beforeunload', (e) => { if (this.store.saving()) e.preventDefault(); });
     }
@@ -213,16 +217,38 @@ class App {
 
     // ---- a newer APK
 
+    // At launch and each time the app comes back to the front (the server asks GitHub every 15 min at most).
     private async checkUpdate() {
+        if (this.update) return;
         try {
             const u = await fetchUpdate();
-            if (u.checked && u.newer && readDismissed() !== u.latest) {
-                // Installing from the app needs both the server's downloader and MainActivity's installer.
-                const selfInstall = Boolean(u.selfInstall && nativeInstaller());
-                this.update = { current: u.current, latest: u.latest, url: u.url, selfInstall };
-            }
+            if (u.checked && u.newer && readDismissed() !== u.latest) this.offerUpdate(u);
         } catch {
             // Offline or GitHub unreachable: nothing to offer, nothing to say.
+        }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private offerUpdate(u: any) {
+        // Installing from the app needs both the server's downloader and MainActivity's installer.
+        const selfInstall = Boolean(u.selfInstall && nativeInstaller());
+        this.update = { current: u.current, latest: u.latest, url: u.url, selfInstall };
+    }
+
+    /** The header's button: asks GitHub now, and offers even a version "Plus tard" was said to. */
+    async checkUpdateNow() {
+        const id = this.activityQueue.add({ label: 'Rechercher une mise à jour', state: 'running' });
+        try {
+            const u = await fetchUpdate({ force: true });
+            if (!u.checked) throw new Error(u.reason || 'not checked');
+            if (u.newer) {
+                this.activityQueue.update(id, { state: 'done', detail: `Version ${u.latest} disponible` });
+                this.offerUpdate(u);
+            } else {
+                this.activityQueue.update(id, { state: 'done', detail: `À jour (${u.current})` });
+            }
+        } catch (e) {
+            this.activityQueue.update(id, { state: 'failed', detail: explain((e as Error).message), retry: () => { this.activityQueue.dismiss(id); return this.checkUpdateNow(); } });
         }
     }
 

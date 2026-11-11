@@ -1,6 +1,6 @@
 <script lang="ts">
     // The app shell: header with the sync state, the tabs, the activity bar, the routine editor.
-    import { CloudCheck, CloudOff, History, LoaderCircle, Plus, RefreshCw } from '@lucide/svelte';
+    import { CircleArrowUp, CloudCheck, CloudOff, History, LoaderCircle, Plus, RefreshCw } from '@lucide/svelte';
     import ActivityBar from '$lib/components/ActivityBar.svelte';
     import LoginPanel from '$lib/components/LoginPanel.svelte';
     import RoutineEditor from '$lib/components/RoutineEditor.svelte';
@@ -45,6 +45,12 @@
                 {/if}
                 <span class="truncate">{sync.text}</span>
             </Badge>
+            <!-- Only a built copy (the app) has updates to look for; one run from source is updated with git. -->
+            {#if app.build?.build}
+                <Button variant="ghost" size="icon" onclick={() => app.checkUpdateNow()} aria-label="Rechercher une mise à jour" title="Rechercher une mise à jour">
+                    <CircleArrowUp />
+                </Button>
+            {/if}
             <Button variant="ghost" size="icon" onclick={() => app.load()} aria-label="Recharger depuis Alexa" title="Recharger depuis Alexa">
                 <RefreshCw />
             </Button>
